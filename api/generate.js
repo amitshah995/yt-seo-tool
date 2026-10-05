@@ -17,7 +17,7 @@ Current title: ${title}
 Current description: ${description.slice(0, 3000)}
 Current tags: ${tags.join(', ')}
 Target keyword (may be empty, then pick the best one): ${keyword}
-Video notes/transcript: ${notes.slice(0, 6000)}
+Video notes/transcript: ${notes.slice(0, 12000)}
 
 OFFICIAL DATA (the only source of facts):
 ${(kb.o || 'none').slice(0, 8000)}
@@ -32,12 +32,12 @@ ${vr.slice(0, 4000)}
 Rules:
 - Keep the SAME language/script as the original (Hindi/Hinglish/Marathi/English). Never change the video's meaning.
 - Use ONLY facts from official data/notes. Never invent facts, prices, income or earning claims, guarantees, or medical claims.
-- Weave the research entities, attributes and sentiment words naturally into title, description, tags and FAQs. No keyword stuffing, do not copy competitor text.
-- Title: 50-70 chars, primary keyword in the first 40 chars, 1-2 strongest research terms, click-worthy but honest.
+- Weave the research entities, attributes and sentiment words naturally into title, description, tags and FAQs. No keyword stuffing, do not copy competitor text. Aim to naturally cover at least 70% of the research terms.
+- Title: 50-70 chars, primary keyword in the first 40 chars, 1-2 strongest research terms, click-worthy but honest. Also give 3 title_options with different angles (curiosity, benefit, how-to), each 50-70 chars with the keyword in the first 40 chars; set "title" to the one you think will rank and get clicked best.
 - LENGTH (most important): description + FAQs + hashtags combined must be between ${cmin} and ${cmax} characters (about ${wmin}-${wmax} words). The YouTube description box must look fully used, like a human SEO expert wrote it: keyword in first 150 chars, strong intro, detailed sections (what the video covers, who it is for, key takeaways, step-by-step points), keyword variations, about the brand/channel, original timestamps/links/CTAs kept. Never pad with repeated sentences or invented facts. No hashtags and no FAQs inside "description".
 - FAQs: 6-10 Q&A, answers 1-3 sentences, based on official data. They count toward the length.
 - Tags: 10-14, total under 450 characters. Hashtags: exactly 3-5, each starting with #.
-Return ONLY JSON: {"keyword":"","title":"","description":"","faqs":[{"q":"","a":""}],"tags":[],"hashtags":[]}`;
+Return ONLY JSON: {"keyword":"","title":"","title_options":[{"angle":"","title":""}],"description":"","faqs":[{"q":"","a":""}],"tags":[],"hashtags":[]}`;
   const ask = async msgs => {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
