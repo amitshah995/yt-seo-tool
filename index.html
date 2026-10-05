@@ -31,6 +31,7 @@ label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
     <label>1. Official data (brand/product facts, past events)</label><textarea id="kbo"></textarea>
     <label>2. Past examples (title, description, tags, hashtags, FAQs)</label><textarea id="kbe"></textarea>
     <label>3. SEO research (entities, attributes, sentiment words)</label><textarea id="kbr"></textarea>
+    <label>4. Voice (kaise bolte ho, kaunse words kabhi nahi, audience, kya claim nahi karte)</label><textarea id="kbv"></textarea>
     <p><button class="alt" onclick="saveKB()">Save</button> <button class="alt" onclick="expKB()">Export</button> <button class="alt" onclick="$('imp').click()">Import</button><input type="file" id="imp" hidden onchange="impKB(this)"> <small id="kbm"></small></p></details>
     <label>Ya video ID / URL se load karo</label>
     <div style="display:flex;gap:6px"><input id="vidin" placeholder="video id ya link"><button class="alt" onclick="loadOne()">Load</button></div>
@@ -47,7 +48,10 @@ label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
       <div><h4>New (editable) <span id="s1" class="score"></span></h4><div id="c1" class="chk"></div></div>
     </div>
     <label>Title <small id="tl"></small></label><input id="nt" oninput="rescore()"><div id="topts"></div>
+    <label>Thumbnail text <small>(sirf reference, max 3 words)</small></label><input id="th" oninput="rescore()"><small id="thb"></small>
+    <div id="tlint" class="chk"></div><div id="qs" class="chk"></div>
     <label>Description <small id="dc"></small></label><textarea id="nd" style="min-height:220px" oninput="rescore()"></textarea>
+    <label>Chapters <small id="cs"></small></label><textarea id="nc" style="min-height:100px" oninput="rescore()"></textarea>
     <label>FAQs (description me add honge)</label><textarea id="nf" style="min-height:120px" oninput="rescore()"></textarea>
     <label>Tags (comma separated) <small id="tg"></small></label><textarea id="ntags" style="min-height:60px" oninput="rescore()"></textarea>
     <label>Hashtags (space separated, 3-5)</label><input id="nh" oninput="rescore()">
@@ -80,11 +84,11 @@ async function loadOne(){if(!cur)return alert('Pehle channel connect karo');cons
 async function open_(id){document.querySelectorAll('.vid').forEach(e=>e.classList.remove('on'));$('v_'+id)?.classList.add('on');
   const j=await yt('videos?part=snippet&id='+id,cur.token);const s=j.items?.[0]?.snippet;if(!s)return alert('Video nahi mila / is channel ka nahi');
   vid={id,snippet:s};$('ed').style.display='block';$('vt').textContent=s.title;
-  $('nt').value=s.title;$('nd').value=s.description;$('ntags').value=(s.tags||[]).join(', ');$('nh').value='';$('nf').value='';$('vr').value='';$('topts').innerHTML='';$('kw').value='';$('ub').disabled=true;$('msg').textContent='';
+  $('nt').value=s.title;$('nd').value=s.description;$('ntags').value=(s.tags||[]).join(', ');$('nh').value='';$('nf').value='';$('vr').value='';$('topts').innerHTML='';$('nc').value='';$('th').value='';$('thb').textContent='';$('qs').innerHTML='';window.QS=[];$('kw').value='';$('ub').disabled=true;$('msg').textContent='';
   const sc=score({title:s.title,description:s.description,tags:s.tags||[],keyword:''});show(0,sc);rescore();showLog()}
 function score(v){const k=(v.keyword||'').toLowerCase(),t=v.title.toLowerCase(),d=v.description.toLowerCase();
   const w=v.description.trim().split(/\s+/).filter(Boolean).length,hs=(v.description.match(/#[\p{L}\p{N}_]+/gu)||[]).length,tc=v.tags.join(',').length;
-  const c=[['Title 40-70 chars',t.length>=40&&t.length<=70,15],['Keyword in title',!!k&&t.includes(k),20],['Keyword in first 40 chars of title',!!k&&t.indexOf(k)>=0&&t.indexOf(k)<=40,10],
+  const c=[['Title 40-60 chars (60+ cut hota hai)',t.length>=40&&t.length<=60,15],['Keyword in title',!!k&&t.includes(k),20],['Keyword in first 40 chars of title',!!k&&t.indexOf(k)>=0&&t.indexOf(k)<=40,10],
   ['Keyword in first 150 chars of description',!!k&&d.slice(0,150).includes(k),15],['Description 200+ words ('+w+')',w>=200,15],
   ['8-15 tags, under 500 chars ('+v.tags.length+')',v.tags.length>=8&&v.tags.length<=15&&tc<=500,10],['Keyword in tags',!!k&&v.tags.some(x=>x.toLowerCase().includes(k)),5],['3-5 hashtags ('+hs+')',hs>=3&&hs<=5,10]];
   const terms=getTerms();let total=c.reduce((a,x)=>a+(x[1]?x[2]:0),0)*(terms.length?0.8:1);
@@ -94,12 +98,12 @@ function score(v){const k=(v.keyword||'').toLowerCase(),t=v.title.toLowerCase(),
 function show(i,s){$('s'+i).textContent=s.total+'/100';$('s'+i).style.color=s.total>=80?'#188038':s.total>=50?'#e37400':'#d93025';
   $('c'+i).innerHTML=s.c.map(x=>`<div class="${x[1]?'pass':'fail'}">${x[1]?'✔':'✘'} ${x[0]}</div>`).join('')}
 const tagsArr=()=>$('ntags').value.split(',').map(x=>x.trim()).filter(Boolean);
-const fullDesc=()=>{let d=$('nd').value.replace(/\s*#[\p{L}\p{N}_]+/gu,'').trim();const f=$('nf').value.trim(),h=$('nh').value.trim();if(f)d+='\n\nFAQs\n'+f;return h?d+'\n\n'+h:d};
-function rescore(){const t=$('nt').value;const fd=fullDesc(),L=lens(),wc=fd.trim().split(/\s+/).filter(Boolean).length;$('dc').innerHTML=fd.length+' chars / '+wc+' words / '+new Blob([fd]).size+' bytes';$('dc').style.color=fd.length>=L.cmin&&fd.length<=L.cmax?'#188038':'#d93025';$('tl').textContent=t.length+'/100';const tg=tagsArr();$('tg').textContent=tg.join(',').length+'/500 chars';
+const fullDesc=()=>{let d=$('nd').value.replace(/\s*#[\p{L}\p{N}_]+/gu,'').trim();const c=$('nc').value.trim();if(c){const i=d.indexOf('\n\n');d=i<0?d+'\n\n'+c:d.slice(0,i)+'\n\n'+c+d.slice(i)}const f=$('nf').value.trim(),h=$('nh').value.trim();if(f)d+='\n\nFAQs\n'+f;return h?d+'\n\n'+h:d};
+function rescore(){lintAll();const t=$('nt').value;const fd=fullDesc(),L=lens(),wc=fd.trim().split(/\s+/).filter(Boolean).length;$('dc').innerHTML=fd.length+' chars / '+wc+' words / '+new Blob([fd]).size+' bytes';$('dc').style.color=fd.length>=L.cmin&&fd.length<=L.cmax?'#188038':'#d93025';$('tl').textContent=t.length+'/100';const tg=tagsArr();$('tg').textContent=tg.join(',').length+'/500 chars';
   if(vid){const s=score({title:t,description:fullDesc(),tags:tg,keyword:$('kw').value});show(1,s)}}
 async function gen(){$('gb').disabled=true;$('gb').textContent='Generating...';
-  try{const s=vid.snippet;const j=await api('generate',{title:s.title,description:s.description,tags:s.tags||[],keyword:$('kw').value,notes:$('notes').value,channel:cur.name,kb:JSON.parse(localStorage[kbKey()]||'{}'),vr:$('vr').value,len:lens()});
-  $('kw').value=j.keyword;$('nt').value=j.title;$('nd').value=j.description;$('ntags').value=j.tags.join(', ');$('nh').value=j.hashtags.join(' ');$('nf').value=(j.faqs||[]).map(f=>'Q: '+f.q+'\nA: '+f.a).join('\n\n');window.TO=j.title_options||[];$('topts').innerHTML=window.TO.map((o,i)=>`<button class="alt" style="display:block;width:100%;text-align:left;margin:4px 0;background:#fff;color:#1a1a1a" onclick="setT(${i})"><b>${esc(o.angle||'')}</b> · ${esc(o.title)} <small>(${o.title.length})</small></button>`).join('');rescore();$('ub').disabled=false}
+  try{const s=vid.snippet;if(!vid.chap&&/-->/.test($('notes').value)){vid.cues=parseSrt($('notes').value);vid.chap=chapterize(vid.cues,8)}const j=await api('generate',{title:s.title,description:s.description,tags:s.tags||[],keyword:$('kw').value,notes:$('notes').value,channel:cur.name,kb:JSON.parse(localStorage[kbKey()]||'{}'),vr:$('vr').value,len:lens(),chapters:(vid.chap||[]).map(c=>({t:fmtT(c.s),text:c.text}))});
+  $('kw').value=j.keyword;$('nt').value=j.title;$('nd').value=j.description;$('ntags').value=j.tags.join(', ');$('nh').value=j.hashtags.join(' ');$('nf').value=(j.faqs||[]).map(f=>'Q: '+f.q+'\nA: '+f.a).join('\n\n');window.TO=j.title_options||[];window.QS=j.queries||[];$('th').value=(j.thumbnail&&j.thumbnail.text)||'';$('thb').textContent=(j.thumbnail&&j.thumbnail.brief)||'';if(vid.chap&&j.chapter_titles)$('nc').value=vid.chap.map((c,i)=>fmtT(c.s)+' '+(j.chapter_titles[i]||'Part '+(i+1))).join('\n');$('topts').innerHTML=window.TO.map((o,i)=>`<button class="alt" style="display:block;width:100%;text-align:left;margin:4px 0;background:#fff;color:#1a1a1a" onclick="setT(${i})"><b>${esc(o.angle||'')}</b> · ${esc(o.title)} <small>(${o.title.length}) ${lintTitle(o.title,'',j.keyword).length?'⚠':'✔'}</small></button>`).join('');rescore();$('ub').disabled=false}
   catch(e){alert('AI error: '+e.message+'\n(Local file se chalaoge to /api nahi chalega, Vercel ya vercel dev use karo)')}
   $('gb').disabled=false;$('gb').textContent='Generate with AI'}
 async function update(){
@@ -110,8 +114,8 @@ async function update(){
   $('msg').textContent='✔ Updated on YouTube';vid.snippet.description=d;vid.snippet.tags=tg;api('db',{action:'addLog',channel:cur.id,video:vid.id,kind:'change',keyword:$('kw').value,payload:{old,new:{title:t,description:d,tags:tg}}}).then(showLog).catch(()=>{});vid.snippet.title=t;$('vt').textContent=t;show(0,score({title:t,description:d,tags:tg,keyword:$('kw').value}))}
   catch(e){alert('Update failed: '+e.message)}}
 const kbKey=()=>'kb_'+(cur?cur.id:'');
-function loadKB(){const f=k=>{$('kbo').value=k.o||'';$('kbe').value=k.e||'';$('kbr').value=k.r||''};f(JSON.parse(localStorage[kbKey()]||'{}'));const id=cur&&cur.id;if(id)api('db',{action:'getKB',channel:id}).then(j=>{if(j.data&&cur&&cur.id==id){localStorage[kbKey()]=JSON.stringify(j.data);f(j.data)}}).catch(()=>{})}
-function saveKB(){if(!cur)return alert('Pehle channel select karo');localStorage[kbKey()]=JSON.stringify({o:$('kbo').value,e:$('kbe').value,r:$('kbr').value});$('kbm').textContent='Saving...';api('db',{action:'setKB',channel:cur.id,data:JSON.parse(localStorage[kbKey()])}).then(()=>$('kbm').textContent='Saved to cloud ✔').catch(e=>$('kbm').textContent='Local saved, cloud error: '+e.message)}
+function loadKB(){const f=k=>{$('kbo').value=k.o||'';$('kbe').value=k.e||'';$('kbr').value=k.r||'';$('kbv').value=k.v||''};f(JSON.parse(localStorage[kbKey()]||'{}'));const id=cur&&cur.id;if(id)api('db',{action:'getKB',channel:id}).then(j=>{if(j.data&&cur&&cur.id==id){localStorage[kbKey()]=JSON.stringify(j.data);f(j.data)}}).catch(()=>{})}
+function saveKB(){if(!cur)return alert('Pehle channel select karo');localStorage[kbKey()]=JSON.stringify({o:$('kbo').value,e:$('kbe').value,r:$('kbr').value,v:$('kbv').value});$('kbm').textContent='Saving...';api('db',{action:'setKB',channel:cur.id,data:JSON.parse(localStorage[kbKey()])}).then(()=>$('kbm').textContent='Saved to cloud ✔').catch(e=>$('kbm').textContent='Local saved, cloud error: '+e.message)}
 function expKB(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([localStorage[kbKey()]||'{}'],{type:'application/json'}));a.download=(cur?cur.name:'channel')+'-knowledge.json';a.click()}
 function impKB(i){const f=i.files[0];if(!f)return;f.text().then(t=>{localStorage[kbKey()]=t;loadKB();$('kbm').textContent='Imported ✔'})}
 const pw=()=>localStorage.pw||(localStorage.pw=prompt('App password?')||'');
@@ -123,6 +127,27 @@ async function rank(){const k=$('kw').value.trim();if(!k)return alert('Focus key
 function prevVer(){const c=(vid.log||[]).find(r=>r.kind=='change');if(!c)return alert('Koi purana version nahi mila');const o=c.payload.old;$('nt').value=o.title;$('nd').value=o.description;$('ntags').value=o.tags.join(', ');$('nf').value='';$('nh').value='';rescore();$('ub').disabled=false;$('msg').textContent='Purana version load hua. Approve dabao to wapas jayega'}
 const lens=()=>({cmin:+$('cmin').value||4800,cmax:+$('cmax').value||5000,wmin:+$('wmin').value||700,wmax:+$('wmax').value||850});
 ['cmin','cmax','wmin','wmax'].forEach(i=>{if(localStorage['l_'+i])$(i).value=localStorage['l_'+i];$(i).onchange=()=>{localStorage['l_'+i]=$(i).value;rescore()}});
+function parseSrt(t){const out=[];t.replace(/\r/g,'').split(/\n\s*\n/).forEach(b=>{const L=b.split('\n'),i=L.findIndex(l=>l.includes('-->'));if(i<0)return;const m=L[i].match(/(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)/);if(!m)return;const s=+m[1]*3600+ +m[2]*60+ +m[3]+ +m[4]/1000,e=+m[5]*3600+ +m[6]*60+ +m[7]+ +m[8]/1000,tx=L.slice(i+1).join(' ').replace(/<[^>]+>/g,'').trim();if(tx)out.push({s,e,t:tx})});return out}
+function chapterize(cues,target){if(!cues||cues.length<6)return [];const dur=cues[cues.length-1].e,wd=x=>new Set(x.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]);const cand=[];
+ for(let i=1;i<cues.length;i++){const s=cues[i].s,gap=Math.max(0,s-cues[i-1].e),b=wd(cues.filter(c=>c.s>=s-45&&c.s<s).map(c=>c.t).join(' ')),a=wd(cues.filter(c=>c.s>=s&&c.s<s+45).map(c=>c.t).join(' '));let n=0;b.forEach(w=>{if(a.has(w))n++});cand.push({s,score:(1-n/((b.size+a.size-n)||1))+Math.min(gap,3)/6})}
+ const min=Math.max(10,dur/(target*2));cand.sort((x,y)=>y.score-x.score);const pick=[0];
+ for(const c of cand){if(pick.length>=target)break;if(c.s<10||dur-c.s<10)continue;if(pick.every(q=>Math.abs(q-c.s)>=min))pick.push(c.s)}
+ pick.sort((x,y)=>x-y);return pick.map((s,i)=>({s:Math.floor(s),text:cues.filter(c=>c.s>=s&&c.s<(pick[i+1]!==undefined?pick[i+1]:1e9)).map(c=>c.t).join(' ').slice(0,250)}))}
+const fmtT=s=>{const h=vid&&vid.cues&&vid.cues.length&&vid.cues[vid.cues.length-1].e>=3600,p=x=>String(x).padStart(2,'0'),S=Math.floor(s%60);return h?Math.floor(s/3600)+':'+p(Math.floor(s%3600/60))+':'+p(S):p(Math.floor(s/60))+':'+p(S)};
+function lintTitle(t,th,k){const is=[],w=x=>x.match(/[\p{L}\p{N}]+/gu)||[];k=(k||'').toLowerCase();
+ if(t.length>60)is.push('60+ chars: desktop search me tail kat jayegi');
+ if(k&&t.length>40&&!t.toLowerCase().slice(0,40).includes(k))is.push('keyword pehle 40 chars me nahi: mobile feed me subject kat sakta hai');
+ if(w(t).filter(x=>x.length>1&&x===x.toUpperCase()&&x!==x.toLowerCase()).length>2)is.push('2 se zyada ALL-CAPS words: spam jaisa lagta hai');
+ if(th){const tw=w(th),set=new Set(w(t).map(x=>x.toLowerCase()).filter(x=>x.length>3));if(tw.length>3)is.push('thumbnail text 3 words se zyada');if(tw.some(x=>x.length>3&&set.has(x.toLowerCase())))is.push('thumbnail title ke words dohra raha hai')}
+ return is}
+function lintAll(){if(!vid)return;const is=lintTitle($('nt').value,$('th').value,$('kw').value);
+ $('tlint').innerHTML=is.length?is.map(x=>'<div class="fail">⚠ '+x+'</div>').join(''):'<div class="pass">✔ Packaging lint OK</div>';
+ const c=$('nc').value.trim();let m='';
+ if(c){const ts=c.split('\n').map(l=>l.match(/^(?:(\d+):)?(\d{1,2}):(\d{2})\s+\S/)).map(x=>x?(+(x[1]||0))*3600+(+x[2])*60+(+x[3]):null);
+  m=ts.includes(null)?'✘ har line "mm:ss Title" format me ho':ts[0]!==0?'✘ pehla chapter 00:00 se ho':ts.length<3?'✘ kam se kam 3 chapters chahiye':ts.some((x,i)=>i&&x-ts[i-1]<10)?'✘ har chapter kam se kam 10 sec ka ho':'✔ valid ('+ts.length+')'}
+ $('cs').textContent=m;$('cs').style.color=m[0]=='✔'?'#188038':'#d93025';
+ const hay=($('nt').value+' '+fullDesc().slice(0,160)).toLowerCase();
+ $('qs').innerHTML=(window.QS||[]).map(q=>{const ws=q.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[],ok=ws.length&&ws.every(x=>hay.includes(x));return '<div class="'+(ok?'pass':'fail')+'">'+(ok?'✔':'✘')+' Query: '+esc(q)+'</div>'}).join('')}
 const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function setT(i){$('nt').value=window.TO[i].title;rescore()}
 function getTerms(){const kb=JSON.parse(localStorage[kbKey()]||'{}');const raw=(kb.r||'')+'\n'+($('vr').value||'');return [...new Set(raw.split(/[\n,;|•·]+/).map(x=>x.replace(/^[\s\-*\d.)]+/,'').replace(/^[A-Za-z ]{3,30}:/,'').trim()).filter(x=>x.length>=3&&x.length<=40))]}
@@ -132,7 +157,7 @@ async function getTr(){if(!vid)return;$('trm').textContent='Loading...';
  const lang=(vid.snippet.defaultAudioLanguage||vid.snippet.defaultLanguage||'').slice(0,2);
  const pick=it.find(c=>c.snippet.trackKind!=='asr'&&c.snippet.language.startsWith(lang))||it.find(c=>c.snippet.trackKind!=='asr')||it.find(c=>c.snippet.language.startsWith(lang))||it[0];
  const r=await fetch('https://www.googleapis.com/youtube/v3/captions/'+pick.id+'?tfmt=srt',{headers:{Authorization:'Bearer '+cur.token}});if(!r.ok)throw new Error('Download error '+r.status+' (auto captions aksar download nahi hote)');
- const t=(await r.text()).split('\n').filter(x=>x.trim()&&!/^\d+$/.test(x.trim())&&!x.includes('-->')).join(' ').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
- $('notes').value=t.slice(0,12000);$('trm').textContent='✔ '+pick.snippet.language+(pick.snippet.trackKind=='asr'?' (auto)':'')+' · '+t.length+' chars'}
+ const raw=await r.text();vid.cues=parseSrt(raw);const t=raw.split('\n').filter(x=>x.trim()&&!/^\d+$/.test(x.trim())&&!x.includes('-->')).join(' ').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+ $('notes').value=t.slice(0,12000);vid.chap=chapterize(vid.cues,8);$('trm').textContent='✔ '+pick.snippet.language+(pick.snippet.trackKind=='asr'?' (auto)':'')+' · '+t.length+' chars · '+vid.chap.length+' chapter points ready'}
  catch(e){$('trm').textContent='✘ '+e.message+'. Notes khud paste karo'}}
 </script></body></html>
