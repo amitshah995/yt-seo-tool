@@ -27,6 +27,11 @@ label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
 <main>
   <div class="card">
     <div id="chs"><small>Pehle Client ID daalo, phir Connect dabao.</small></div>
+    <details id="kb" style="margin:8px 0"><summary><b>Channel Knowledge</b> <small>(har channel ka alag)</small></summary>
+    <label>1. Official data (brand/product facts, past events)</label><textarea id="kbo"></textarea>
+    <label>2. Past examples (title, description, tags, hashtags, FAQs)</label><textarea id="kbe"></textarea>
+    <label>3. SEO research (entities, attributes, sentiment words)</label><textarea id="kbr"></textarea>
+    <p><button class="alt" onclick="saveKB()">Save</button> <button class="alt" onclick="expKB()">Export</button> <button class="alt" onclick="$('imp').click()">Import</button><input type="file" id="imp" hidden onchange="impKB(this)"> <small id="kbm"></small></p></details>
     <label>Ya video ID / URL se load karo</label>
     <div style="display:flex;gap:6px"><input id="vidin" placeholder="video id ya link"><button class="alt" onclick="loadOne()">Load</button></div>
     <label>Latest videos</label><div id="list"><small>Channel select karo.</small></div>
@@ -35,12 +40,14 @@ label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
     <b id="vt"></b>
     <div style="display:flex;gap:8px;margin-top:8px"><input id="kw" placeholder="Focus keyword (optional)"><button onclick="gen()" id="gb">Generate with AI</button></div>
     <label>Extra notes / transcript (optional)</label><textarea id="notes" style="min-height:60px"></textarea>
+    <label>Research for this video: top-10 entities, attributes, sentiment words (optional)</label><textarea id="vr" style="min-height:60px"></textarea>
     <div class="cols">
       <div><h4>Current <span id="s0" class="score"></span></h4><div id="c0" class="chk"></div></div>
       <div><h4>New (editable) <span id="s1" class="score"></span></h4><div id="c1" class="chk"></div></div>
     </div>
     <label>Title <small id="tl"></small></label><input id="nt" oninput="rescore()">
     <label>Description</label><textarea id="nd" style="min-height:220px" oninput="rescore()"></textarea>
+    <label>FAQs (description me add honge)</label><textarea id="nf" style="min-height:120px" oninput="rescore()"></textarea>
     <label>Tags (comma separated) <small id="tg"></small></label><textarea id="ntags" style="min-height:60px" oninput="rescore()"></textarea>
     <label>Hashtags (space separated, 3-5)</label><input id="nh" oninput="rescore()">
     <p><button class="ok" id="ub" onclick="update()" disabled>Approve &amp; Update on YouTube</button>
@@ -62,7 +69,7 @@ function connect(){
   tc.requestAccessToken();
 }
 function drawCh(){$('chs').innerHTML=chans.map(c=>`<span class="ch ${cur&&cur.id==c.id?'on':''}" onclick="pick('${c.id}')">${c.name}</span>`).join('')}
-async function pick(id){cur=chans.find(c=>c.id==id);drawCh();$('list').innerHTML='Loading...';
+async function pick(id){cur=chans.find(c=>c.id==id);drawCh();loadKB();$('list').innerHTML='Loading...';
   try{const p=await yt('playlistItems?part=contentDetails&maxResults=50&playlistId='+cur.up,cur.token);
   const ids=p.items.map(i=>i.contentDetails.videoId).join(',');const v=await yt('videos?part=snippet,statistics&id='+ids,cur.token);
   $('list').innerHTML=v.items.map(x=>`<div class="vid" id="v_${x.id}" onclick="open_('${x.id}')">${x.snippet.title}<br><small>${x.statistics.viewCount||0} views</small></div>`).join('')}
@@ -71,7 +78,7 @@ async function loadOne(){if(!cur)return alert('Pehle channel connect karo');cons
 async function open_(id){document.querySelectorAll('.vid').forEach(e=>e.classList.remove('on'));$('v_'+id)?.classList.add('on');
   const j=await yt('videos?part=snippet&id='+id,cur.token);const s=j.items?.[0]?.snippet;if(!s)return alert('Video nahi mila / is channel ka nahi');
   vid={id,snippet:s};$('ed').style.display='block';$('vt').textContent=s.title;
-  $('nt').value=s.title;$('nd').value=s.description;$('ntags').value=(s.tags||[]).join(', ');$('nh').value='';$('kw').value='';$('ub').disabled=true;$('msg').textContent='';
+  $('nt').value=s.title;$('nd').value=s.description;$('ntags').value=(s.tags||[]).join(', ');$('nh').value='';$('nf').value='';$('vr').value='';$('kw').value='';$('ub').disabled=true;$('msg').textContent='';
   const sc=score({title:s.title,description:s.description,tags:s.tags||[],keyword:''});show(0,sc);rescore()}
 function score(v){const k=(v.keyword||'').toLowerCase(),t=v.title.toLowerCase(),d=v.description.toLowerCase();
   const w=v.description.trim().split(/\s+/).filter(Boolean).length,hs=(v.description.match(/#[\p{L}\p{N}_]+/gu)||[]).length,tc=v.tags.join(',').length;
@@ -82,13 +89,13 @@ function score(v){const k=(v.keyword||'').toLowerCase(),t=v.title.toLowerCase(),
 function show(i,s){$('s'+i).textContent=s.total+'/100';$('s'+i).style.color=s.total>=80?'#188038':s.total>=50?'#e37400':'#d93025';
   $('c'+i).innerHTML=s.c.map(x=>`<div class="${x[1]?'pass':'fail'}">${x[1]?'✔':'✘'} ${x[0]}</div>`).join('')}
 const tagsArr=()=>$('ntags').value.split(',').map(x=>x.trim()).filter(Boolean);
-const fullDesc=()=>{const d=$('nd').value.replace(/\s*#[\p{L}\p{N}_]+/gu,'').trim(),h=$('nh').value.trim();return h?d+'\n\n'+h:d};
+const fullDesc=()=>{let d=$('nd').value.replace(/\s*#[\p{L}\p{N}_]+/gu,'').trim();const f=$('nf').value.trim(),h=$('nh').value.trim();if(f)d+='\n\nFAQs\n'+f;return h?d+'\n\n'+h:d};
 function rescore(){const t=$('nt').value;$('tl').textContent=t.length+'/100';const tg=tagsArr();$('tg').textContent=tg.join(',').length+'/500 chars';
   if(vid){const s=score({title:t,description:fullDesc(),tags:tg,keyword:$('kw').value});show(1,s)}}
 async function gen(){$('gb').disabled=true;$('gb').textContent='Generating...';
-  try{const s=vid.snippet;const r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:s.title,description:s.description,tags:s.tags||[],keyword:$('kw').value,notes:$('notes').value,channel:cur.name})});
+  try{const s=vid.snippet;const r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:s.title,description:s.description,tags:s.tags||[],keyword:$('kw').value,notes:$('notes').value,channel:cur.name,kb:JSON.parse(localStorage[kbKey()]||'{}'),vr:$('vr').value})});
   const j=await r.json();if(!r.ok)throw new Error(j.error);
-  $('kw').value=j.keyword;$('nt').value=j.title;$('nd').value=j.description;$('ntags').value=j.tags.join(', ');$('nh').value=j.hashtags.join(' ');rescore();$('ub').disabled=false}
+  $('kw').value=j.keyword;$('nt').value=j.title;$('nd').value=j.description;$('ntags').value=j.tags.join(', ');$('nh').value=j.hashtags.join(' ');$('nf').value=(j.faqs||[]).map(f=>'Q: '+f.q+'\nA: '+f.a).join('\n\n');rescore();$('ub').disabled=false}
   catch(e){alert('AI error: '+e.message+'\n(Local file se chalaoge to /api nahi chalega, Vercel ya vercel dev use karo)')}
   $('gb').disabled=false;$('gb').textContent='Generate with AI'}
 async function update(){
@@ -98,4 +105,9 @@ async function update(){
   try{await yt('videos?part=snippet',cur.token,{method:'PUT',body:JSON.stringify({id:vid.id,snippet:{title:t,description:d,tags:tg,categoryId:vid.snippet.categoryId,defaultLanguage:vid.snippet.defaultLanguage}})});
   $('msg').textContent='✔ Updated on YouTube';vid.snippet.title=t;$('vt').textContent=t;show(0,score({title:t,description:d,tags:tg,keyword:$('kw').value}))}
   catch(e){alert('Update failed: '+e.message)}}
+const kbKey=()=>'kb_'+(cur?cur.id:'');
+function loadKB(){const k=JSON.parse(localStorage[kbKey()]||'{}');$('kbo').value=k.o||'';$('kbe').value=k.e||'';$('kbr').value=k.r||''}
+function saveKB(){if(!cur)return alert('Pehle channel select karo');localStorage[kbKey()]=JSON.stringify({o:$('kbo').value,e:$('kbe').value,r:$('kbr').value});$('kbm').textContent='Saved ✔'}
+function expKB(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([localStorage[kbKey()]||'{}'],{type:'application/json'}));a.download=(cur?cur.name:'channel')+'-knowledge.json';a.click()}
+function impKB(i){const f=i.files[0];if(!f)return;f.text().then(t=>{localStorage[kbKey()]=t;loadKB();$('kbm').textContent='Imported ✔'})}
 </script></body></html>
