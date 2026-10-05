@@ -21,7 +21,7 @@ Return ONLY JSON: {"keyword":"","title":"","description":"","tags":[],"hashtags"
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: process.env.MODEL || 'claude-sonnet-5-5', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: process.env.MODEL || 'claude-haiku-4-5-20251001', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
     });
     const j = await r.json();
     if (!r.ok) return res.status(500).json({ error: j.error?.message || 'AI error' });
