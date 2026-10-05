@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YouTube SEO Optimizer</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;background:#f4f5f7;color:#1a1a1a}
+header{background:#fff;padding:12px 20px;border-bottom:1px solid #ddd;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+main{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px}
+@media(max-width:850px){main{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px}
+input,textarea,button{font:inherit;padding:8px;border:1px solid #bbb;border-radius:6px;width:100%}
+textarea{min-height:90px}button{width:auto;cursor:pointer;background:#1a73e8;color:#fff;border:0}
+button.alt{background:#fff;color:#1a1a1a;border:1px solid #bbb}button.ok{background:#188038}button:disabled{opacity:.5}
+.vid{padding:8px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px}.vid:hover,.vid.on{background:#e8f0fe}
+.ch{display:inline-block;padding:6px 12px;margin:0 6px 6px 0;border-radius:20px;border:1px solid #bbb;cursor:pointer;font-size:14px}.ch.on{background:#1a73e8;color:#fff}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.cols{grid-template-columns:1fr}}
+label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
+.score{font-size:34px;font-weight:700}.chk{font-size:13px}.pass{color:#188038}.fail{color:#d93025}
+#list{max-height:60vh;overflow:auto}small{color:#666}
+</style></head><body>
+<header>
+  <b>YouTube SEO Optimizer</b>
+  <input id="cid" placeholder="Google OAuth Client ID" style="max-width:380px">
+  <button onclick="connect()">+ Connect channel</button>
+  <small>Max 5 channels. Connect har channel ke liye alag.</small>
+</header>
+<main>
+  <div class="card">
+    <div id="chs"><small>Pehle Client ID daalo, phir Connect dabao.</small></div>
+    <label>Ya video ID / URL se load karo</label>
+    <div style="display:flex;gap:6px"><input id="vidin" placeholder="video id ya link"><button class="alt" onclick="loadOne()">Load</button></div>
+    <label>Latest videos</label><div id="list"><small>Channel select karo.</small></div>
+  </div>
+  <div class="card" id="ed" style="display:none">
+    <b id="vt"></b>
+    <div style="display:flex;gap:8px;margin-top:8px"><input id="kw" placeholder="Focus keyword (optional)"><button onclick="gen()" id="gb">Generate with AI</button></div>
+    <label>Extra notes / transcript (optional)</label><textarea id="notes" style="min-height:60px"></textarea>
+    <div class="cols">
+      <div><h4>Current <span id="s0" class="score"></span></h4><div id="c0" class="chk"></div></div>
+      <div><h4>New (editable) <span id="s1" class="score"></span></h4><div id="c1" class="chk"></div></div>
+    </div>
+    <label>Title <small id="tl"></small></label><input id="nt" oninput="rescore()">
+    <label>Description</label><textarea id="nd" style="min-height:220px" oninput="rescore()"></textarea>
+    <label>Tags (comma separated) <small id="tg"></small></label><textarea id="ntags" style="min-height:60px" oninput="rescore()"></textarea>
+    <label>Hashtags (space separated, 3-5)</label><input id="nh" oninput="rescore()">
+    <p><button class="ok" id="ub" onclick="update()" disabled>Approve &amp; Update on YouTube</button>
+    <small id="msg"></small></p>
+    <small>Score = on-page SEO checklist. Ranking guarantee nahi hoti (competition, CTR, retention bhi matter karte hain).</small>
+  </div>
+</main>
+<script>
+const $=id=>document.getElementById(id);let chans=[],cur=null,vid=null,tc=null;
+$('cid').value=localStorage.cid||'';$('cid').onchange=()=>localStorage.cid=$('cid').value.trim();
+const yt=async(p,t,o={})=>{const r=await fetch('https://www.googleapis.com/youtube/v3/'+p,{...o,headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'}});const j=await r.json();if(!r.ok)throw new Error(j.error?.message||'YouTube error');return j};
+function connect(){
+  if(chans.length>=5)return alert('Max 5 channels');
+  const id=$('cid').value.trim();if(!id)return alert('Client ID daalo');
+  tc=google.accounts.oauth2.initTokenClient({client_id:id,scope:'https://www.googleapis.com/auth/youtube',prompt:'select_account',
+   callback:async r=>{if(r.error)return alert(r.error);
+    const j=await yt('channels?part=snippet,contentDetails&mine=true',r.access_token);const c=j.items?.[0];if(!c)return alert('Is account me channel nahi mila');
+    chans=chans.filter(x=>x.id!==c.id);chans.push({id:c.id,name:c.snippet.title,token:r.access_token,up:c.contentDetails.relatedPlaylists.uploads});drawCh();pick(c.id)}});
+  tc.requestAccessToken();
+}
+function drawCh(){$('chs').innerHTML=chans.map(c=>`<span class="ch ${cur&&cur.id==c.id?'on':''}" onclick="pick('${c.id}')">${c.name}</span>`).join('')}
+async function pick(id){cur=chans.find(c=>c.id==id);drawCh();$('list').innerHTML='Loading...';
+  try{const p=await yt('playlistItems?part=contentDetails&maxResults=50&playlistId='+cur.up,cur.token);
+  const ids=p.items.map(i=>i.contentDetails.videoId).join(',');const v=await yt('videos?part=snippet,statistics&id='+ids,cur.token);
+  $('list').innerHTML=v.items.map(x=>`<div class="vid" id="v_${x.id}" onclick="open_('${x.id}')">${x.snippet.title}<br><small>${x.statistics.viewCount||0} views</small></div>`).join('')}
+  catch(e){$('list').innerHTML='Token expire? Connect dobara karo. '+e.message}}
+async function loadOne(){if(!cur)return alert('Pehle channel connect karo');const m=$('vidin').value.match(/([\w-]{11})/);if(m)open_(m[1])}
+async function open_(id){document.querySelectorAll('.vid').forEach(e=>e.classList.remove('on'));$('v_'+id)?.classList.add('on');
+  const j=await yt('videos?part=snippet&id='+id,cur.token);const s=j.items?.[0]?.snippet;if(!s)return alert('Video nahi mila / is channel ka nahi');
+  vid={id,snippet:s};$('ed').style.display='block';$('vt').textContent=s.title;
+  $('nt').value=s.title;$('nd').value=s.description;$('ntags').value=(s.tags||[]).join(', ');$('nh').value='';$('kw').value='';$('ub').disabled=true;$('msg').textContent='';
+  const sc=score({title:s.title,description:s.description,tags:s.tags||[],keyword:''});show(0,sc);rescore()}
+function score(v){const k=(v.keyword||'').toLowerCase(),t=v.title.toLowerCase(),d=v.description.toLowerCase();
+  const w=v.description.trim().split(/\s+/).filter(Boolean).length,hs=(v.description.match(/#[\p{L}\p{N}_]+/gu)||[]).length,tc=v.tags.join(',').length;
+  const c=[['Title 40-70 chars',t.length>=40&&t.length<=70,15],['Keyword in title',!!k&&t.includes(k),20],['Keyword in first 40 chars of title',!!k&&t.indexOf(k)>=0&&t.indexOf(k)<=40,10],
+  ['Keyword in first 150 chars of description',!!k&&d.slice(0,150).includes(k),15],['Description 200+ words ('+w+')',w>=200,15],
+  ['8-15 tags, under 500 chars ('+v.tags.length+')',v.tags.length>=8&&v.tags.length<=15&&tc<=500,10],['Keyword in tags',!!k&&v.tags.some(x=>x.toLowerCase().includes(k)),5],['3-5 hashtags ('+hs+')',hs>=3&&hs<=5,10]];
+  return{total:c.reduce((a,x)=>a+(x[1]?x[2]:0),0),c}}
+function show(i,s){$('s'+i).textContent=s.total+'/100';$('s'+i).style.color=s.total>=80?'#188038':s.total>=50?'#e37400':'#d93025';
+  $('c'+i).innerHTML=s.c.map(x=>`<div class="${x[1]?'pass':'fail'}">${x[1]?'✔':'✘'} ${x[0]}</div>`).join('')}
+const tagsArr=()=>$('ntags').value.split(',').map(x=>x.trim()).filter(Boolean);
+const fullDesc=()=>{const d=$('nd').value.replace(/\s*#[\p{L}\p{N}_]+/gu,'').trim(),h=$('nh').value.trim();return h?d+'\n\n'+h:d};
+function rescore(){const t=$('nt').value;$('tl').textContent=t.length+'/100';const tg=tagsArr();$('tg').textContent=tg.join(',').length+'/500 chars';
+  if(vid){const s=score({title:t,description:fullDesc(),tags:tg,keyword:$('kw').value});show(1,s)}}
+async function gen(){$('gb').disabled=true;$('gb').textContent='Generating...';
+  try{const s=vid.snippet;const r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:s.title,description:s.description,tags:s.tags||[],keyword:$('kw').value,notes:$('notes').value,channel:cur.name})});
+  const j=await r.json();if(!r.ok)throw new Error(j.error);
+  $('kw').value=j.keyword;$('nt').value=j.title;$('nd').value=j.description;$('ntags').value=j.tags.join(', ');$('nh').value=j.hashtags.join(' ');rescore();$('ub').disabled=false}
+  catch(e){alert('AI error: '+e.message+'\n(Local file se chalaoge to /api nahi chalega, Vercel ya vercel dev use karo)')}
+  $('gb').disabled=false;$('gb').textContent='Generate with AI'}
+async function update(){
+  const t=$('nt').value.trim(),d=fullDesc(),tg=tagsArr();
+  if(t.length>100||tg.join(',').length>500)return alert('Title 100 ya tags 500 chars se zyada hain');
+  if(!confirm('YouTube par ye update kar du?\n\nTitle: '+t))return;
+  try{await yt('videos?part=snippet',cur.token,{method:'PUT',body:JSON.stringify({id:vid.id,snippet:{title:t,description:d,tags:tg,categoryId:vid.snippet.categoryId,defaultLanguage:vid.snippet.defaultLanguage}})});
+  $('msg').textContent='✔ Updated on YouTube';vid.snippet.title=t;$('vt').textContent=t;show(0,score({title:t,description:d,tags:tg,keyword:$('kw').value}))}
+  catch(e){alert('Update failed: '+e.message)}}
+</script></body></html>
