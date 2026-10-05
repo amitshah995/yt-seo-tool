@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YouTube SEO Optimizer + Analytics</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;background:#f4f5f7;color:#1a1a1a}
+header{background:#fff;padding:12px 20px;border-bottom:1px solid #ddd;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+main{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px}
+@media(max-width:850px){main{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px}
+input,textarea,button,select{font:inherit;padding:8px;border:1px solid #bbb;border-radius:6px;width:100%}
+textarea{min-height:90px}button{width:auto;cursor:pointer;background:#1a73e8;color:#fff;border:0}
+button.alt{background:#fff;color:#1a1a1a;border:1px solid #bbb}button.ok{background:#188038}button:disabled{opacity:.5}
+.vid{padding:8px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px}.vid:hover,.vid.on{background:#e8f0fe}
+.ch{display:inline-block;padding:6px 12px;margin:0 6px 6px 0;border-radius:20px;border:1px solid #bbb;cursor:pointer;font-size:14px}.ch.on{background:#1a73e8;color:#fff}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.cols{grid-template-columns:1fr}}
+label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
+.score{font-size:34px;font-weight:700}.chk{font-size:13px}.pass{color:#188038}.fail{color:#d93025}
+#list{max-height:60vh;overflow:auto}small{color:#666}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
+th{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;padding:2px 6px;border-radius:4px;background:#e8f0fe;color:#1a73e8;font-size:11px;margin:2px 2px 0 0}
+</style></head><body>
+<header>
+  <b>YouTube SEO Optimizer</b>
+  <input id="cid" placeholder="Google OAuth Client ID" style="max-width:380px">
+  <button onclick="connect()">+ Connect channel</button>
+  <button class="alt" onclick="toggleDash()">📊 Analytics & Striking Distance</button>
+  <small>Max 5 channels. Connect har channel ke liye alag.</small>
+</header>
+
+<!-- NEW ANALYTICS DASHBOARD SECTION -->
+<div id="dash" style="display:none;padding:16px 16px 0">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <b style="font-size:17px">📊 YouTube Search & Striking Distance Dashboard</b><br>
+        <small>Dekho kis video par search views, retention aur impressions/queries aa rahe hain. Seedha "Optimize" dabao.</small>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="adays" style="width:130px"><option value="28">Last 28 Days</option><option value="90" selected>Last 90 Days</option><option value="365">Last 365 Days</option></select>
+        <button onclick="loadAnalytics()" id="abtn">Fetch Analytics</button>
+      </div>
+    </div>
+    <div id="amsg" style="margin-top:8px;font-size:13px;color:#d93025"></div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Video Title</th>
+            <th class="num">Period Views</th>
+            <th class="num">Avg View % (Retention)</th>
+            <th class="num">Avg Duration (sec)</th>
+            <th>Top Search Keywords (click to load)</th>
+            <th class="num" title="High retention + decent views = easy rank boost">Opp. Score</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="atb"><tr><td colspan="7"><small>Channel connect karke "Fetch Analytics" dabao.</small></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="card">
+    <div id="chs"><small>Pehle Client ID daalo, phir Connect dabao.</small></div>
+    <details id="kb" style="margin:8px 0"><summary><b>Channel Knowledge</b> <small>(har channel ka alag)</small></summary>
+    <label>1. Official data (brand/product facts, past events)</label><textarea id="kbo"></textarea>
+    <label>2. Past examples (title, description, tags, hashtags, FAQs)</label><textarea id="kbe"></textarea>
+    <label>3. SEO research (entities, attributes, sentiment words)</label><textarea id="kbr"></textarea>
+    <label>4. Voice (kaise bolte ho, kaunse words kabhi nahi, audience, kya claim nahi karte)</label><textarea id="kbv"></textarea>
+    <p><button class="alt" onclick="saveKB()">Save</button> <button class="alt" onclick="expKB()">Export</button> <button class="alt" onclick="$('imp').click()">Import</button><input type="file" id="imp" hidden onchange="impKB(this)"> <small id="kbm"></small></p></details>
+    <label>Ya video ID / URL se load karo</label>
+    <div style="display:flex;gap:6px"><input id="vidin" placeholder="video id ya link"><button class="alt" onclick="loadOne()">Load</button></div>
+    <label>Latest videos</label><div id="list"><small>Channel select karo.</small></div>
+  </div>
+  <div class="card" id="ed" style="display:none">
+    <b id="vt"></b>
+    <div style="display:flex;gap:8px;margin-top:8px"><input id="kw" placeholder="Focus keyword (optional)"><button onclick="gen()" id="gb">Generate with AI</button></div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px"><small><b>Description size:</b> chars</small><input id="cmin" type="number" value="4800" style="width:80px"><small>to</small><input id="cmax" type="number" value="5000" style="width:80px"><small>words</small><input id="wmin" type="number" value="700" style="width:70px"><small>to</small><input id="wmax" type="number" value="850" style="width:70px"></div>
+    <label>Extra notes / transcript (optional) <button class="alt" style="padding:2px 8px;font-size:12px" onclick="getTr()">Auto transcript</button> <small id="trm"></small></label><textarea id="notes" style="min-height:60px"></textarea>
+    <label>Research for this video: top-10 entities, attributes, sentiment words (optional)</label><textarea id="vr" style="min-height:60px"></textarea>
+    <div class="cols">
+      <div><h4>Current <span id="s0" class="score"></span></h4><div id="c0" class="chk"></div></div>
+      <div><h4>New (editable) <span id="s1" class="score"></span></h4><div id="c1" class="chk"></div></div>
+    </div>
+    <label>Title <small id="tl"></small></label><input id="nt" oninput="rescore()"><div id="topts"></div>
+    <label>Thumbnail text <small>(sirf reference, max 3 words)</small></label><input id="th" oninput="rescore()"><small id="thb"></small>
+    <div id="tlint" class="chk"></div><div id="qs" class="chk"></div>
+    <label>Description <small id="dc"></small></label><textarea id="nd" style="min-height:220px" oninput="rescore()"></textarea>
+    <label>Chapters <small id="cs"></small></label><textarea id="nc" style="min-height:100px" oninput="rescore()"></textarea>
+    <label>FAQs (description me add honge)</label><textarea id="nf" style="min-height:120px" oninput="rescore()"></textarea>
+    <label>Tags (comma separated) <small id="tg"></small></label><textarea id="ntags" style="min-height:60px" oninput="rescore()"></textarea>
+    <label>Hashtags (space separated, 3-5)</label><input id="nh" oninput="rescore()">
+    <p><button class="ok" id="ub" onclick="update()" disabled>Approve &amp; Update on YouTube</button>
+    <small id="msg"></small></p>
+    <p><button class="alt" onclick="rank()">Check YouTube rank</button> <button class="alt" onclick="prevVer()">Load previous version</button> <small id="rk"></small></p><div id="log" class="chk"></div>
+    <small>Score = on-page SEO checklist. Ranking guarantee nahi hoti (competition, CTR, retention bhi matter karte hain).</small>
+  </div>
+</main>
+<script>
+const $=id=>document.getElementById(id);let chans=[],cur=null,vid=null,tc=null,vmap={};
+$('cid').value=localStorage.cid||'';$('cid').onchange=()=>localStorage.cid=$('cid').value.trim();
+const yt=async(p,t,o={})=>{const r=await fetch('https://www.googleapis.com/youtube/v3/'+p,{...o,headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'}});const j=await r.json();if(!r.ok)throw new Error(j.error?.message||'YouTube error');return j};
+const yta=async(p,t)=>{const r=await fetch('https://youtubeanalytics.googleapis.com/v2/reports?'+p,{headers:{Authorization:'Bearer '+t}});const j=await r.json();if(!r.ok)throw new Error(j.error?.message||'Analytics API error');return j};
+
+function toggleDash(){$('dash').style.display=$('dash').style.display==='none'?'block':'none'}
+
+function connect(){
+  if(chans.length>=5)return alert('Max 5 channels');
+  const id=$('cid').value.trim();if(!id)return alert('Client ID daalo');
+  tc=google.accounts.oauth2.initTokenClient({client_id:id,scope:'https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/yt-analytics.readonly',prompt:'select_account',
+   callback:async r=>{if(r.error)return alert(r.error);
+    const j=await yt('channels?part=snippet,contentDetails&mine=true',r.access_token);const c=j.items?.[0];if(!c)return alert('Is account me channel nahi mila');
+    chans=chans.filter(x=>x.id!==c.id);chans.push({id:c.id,name:c.snippet.title,token:r.access_token,up:c.contentDetails.relatedPlaylists.uploads});drawCh();pick(c.id)}});
+  tc.requestAccessToken();
+}
+function drawCh(){$('chs').innerHTML=chans.map(c=>`<span class="ch ${cur&&cur.id==c.id?'on':''}" onclick="pick('${c.id}')">${c.name}</span>`).join('')}
+async function pick(id){cur=chans.find(c=>c.id==id);drawCh();loadKB();$('list').innerHTML='Loading...';
+  try{const p=await yt('playlistItems?part=contentDetails&maxResults=50&playlistId='+cur.up,cur.token);
+  const ids=p.items.map(i=>i.contentDetails.videoId).join(',');const v=await yt('videos?part=snippet,statistics&id='+ids,cur.token);
+  v.items.forEach(x=>vmap[x.id]=x.snippet.title);
+  $('list').innerHTML=v.items.map(x=>`<div class="vid" id="v_${x.id}" onclick="open_('${x.id}')">${x.snippet.title}<br><small>${x.statistics.viewCount||0} views</small></div>`).join('')}
+  catch(e){$('list').innerHTML='Token expire? Connect dobara karo. '+e.message}}
+
+async function loadAnalytics(){
+  if(!cur)return alert('Pehle channel connect karo!');
+  $('abtn').disabled=true;$('amsg').textContent='Fetching YouTube Analytics & Search Terms...';
+  try{
+    const days=+$('adays').value,e=new Date(Date.now()-2*864e5),s=new Date(e-days*864e5),f=d=>d.toISOString().slice(0,10);
+    const rep=await yta(`ids=channel==MINE&startDate=${f(s)}&endDate=${f(e)}&metrics=views,averageViewDuration,averageViewPercentage,likes&dimensions=video&sort=-views&maxResults=30`,cur.token);
+    const rows=rep.rows||[];
+    if(!rows.length){$('atb').innerHTML='<tr><td colspan="7">Is period me koi data nahi mila.</td></tr>';$('amsg').textContent='';$('abtn').disabled=false;return}
+    const missing=rows.map(r=>r[0]).filter(id=>!vmap[id]);
+    if(missing.length){const vd=await yt('videos?part=snippet&id='+missing.join(','),cur.token);(vd.items||[]).forEach(x=>vmap[x.id]=x.snippet.title)}
+    const data=await Promise.all(rows.map(async r=>{
+      const vidId=r[0],views=r[1],avgDur=Math.round(r[2]),avgPct=r[3],likes=r[4];
+      let terms=[];
+      try{
+        const tr=await yta(`ids=channel==MINE&startDate=${f(s)}&endDate=${f(e)}&metrics=views&dimensions=insightTrafficSourceDetail&filters=video==${vidId};insightTrafficSourceType==YT_SEARCH&sort=-views&maxResults=5`,cur.token);
+        terms=(tr.rows||[]).map(x=>({q:x[0],v:x[1]}));
+      }catch(_){}
+      const opp=Math.round((avgPct*1.5)+(terms.length*15)+(views>0?Math.min(30,1000/views):0));
+      return {id:vidId,title:vmap[vidId]||vidId,views,avgDur,avgPct,likes,terms,opp};
+    }));
+    data.sort((a,b)=>b.opp-a.opp);
+    $('atb').innerHTML=data.map(d=>`<tr>
+      <td><b>${esc(d.title)}</b></td>
+      <td class="num">${d.views}</td>
+      <td class="num">${d.avgPct.toFixed(1)}%</td>
+      <td class="num">${d.avgDur}s</td>
+      <td>${d.terms.map(t=>`<span class="badge" style="cursor:pointer" onclick="optVid('${d.id}','${esc(t.q)}')">${esc(t.q)} (${t.v})</span>`).join(' ')||'<small>No search terms yet</small>'}</td>
+      <td class="num"><b>${d.opp}</b></td>
+      <td><button style="padding:4px 10px;font-size:12px" onclick="optVid('${d.id}','${esc(d.terms[0]?.q||'')}')">Optimize ⚡</button></td>
+    </tr>`).join('');
+    $('amsg').textContent='';
+  }catch(e){$('amsg').textContent='Error: '+e.message+' (Check karo ki YouTube Analytics API enabled hai aur channel dobara Connect kiya hai)';}$('abtn').disabled=false;
+}
+
+async function optVid(id,kw){
+  await open_(id);
+  if(kw){$('kw').value=kw;rescore()}$('ed').scrollIntoView({behavior:'smooth'});
+}
+
+async function loadOne(){if(!cur)return alert('Pehle channel connect karo');const m=$('vidin').value.match(/([\w-]{11})/);if(m)open_(m[1])}
+async function open_(id){document.querySelectorAll('.vid').forEach(e=>e.classList.remove('on'));$('v_'+id)?.classList.add('on');
+  const j=await yt('videos?part=snippet&id='+id,cur.token);const s=j.items?.[0]?.snippet;if(!s)return alert('Video nahi mila / is channel ka nahi');
+  vid={id,snippet:s};$('ed').style.display='block';$('vt').textContent=s.title;
+  $('nt').value=s.title;$('nd').value=s.description;$('ntags').value=(s.tags\vert{}\vert{}[]).join(', ');$('nh').value='';$('nf').value='';$('vr').value='';$('topts').innerHTML='';$('nc').value='';$('th').value='';$('thb').textContent='';$('qs').innerHTML='';window.QS=[];$('kw').value='';$('ub').disabled=true;$('msg').textContent='';
+  const sc=score({title:s.title,description:s.description,tags:s.tags||[],keyword:''});show(0,sc);rescore();showLog()}
+function score(v){const k=(v.keyword||'').toLowerCase(),t=v.title.toLowerCase(),d=v.description.toLowerCase();
+  const w=v.description.trim().split(/\s+/).filter(Boolean).length,hs=(v.description.match(/#[\p{L}\p{N}_]+/gu)||[]).length,tc=v.tags.join(',').length;
+  const c=[['Title 40-60 chars (60+ cut hota hai)',t.length>=40&&t.length<=60,15],['Keyword in title',!!k&&t.includes(k),20],['Keyword in first 40 chars of title',!!k&&t.indexOf(k)>=0&&t.indexOf(k)<=40,10],
+  ['Keyword in first 150 chars of description',!!k&&d.slice(0,150).includes(k),15],['Description 200+ words ('+w+')',w>=200,15],
+  ['8-15 tags, under 500 chars ('+v.tags.length+')',v.tags.length>=8&&v.tags.length<=15&&tc<=500,10],['Keyword in tags',!!k&&v.tags.some(x=>x.toLowerCase().includes(k)),5],['3-5 hashtags ('+hs+')',hs>=3&&hs<=5,10]];
+  const terms=getTerms();let total=c.reduce((a,x)=>a+(x[1]?x[2]:0),0)*(terms.length?0.8:1);
+  if(terms.length){const tx=(v.title+' '+v.description+' '+v.tags.join(' ')).toLowerCase(),miss=terms.filter(t=>!tx.includes(t.toLowerCase())),hit=terms.length-miss.length;
+   total+=hit/terms.length*20;c.push(['Research terms used '+hit+'/'+terms.length,hit/terms.length>=.6,0]);if(miss.length)c.push(['Missing: '+miss.slice(0,8).join(', '),false,0])}
+  return{total:Math.round(total),c}}
+function show(i,s){$('s'+i).textContent=s.total+'/100';$('s'+i).style.color=s.total>=80?'#188038':s.total>=50?'#e37400':'#d93025';
+  $('c'+i).innerHTML=s.c.map(x=>`<div class="${x[1]?'pass':'fail'}">${x[1]?'✔':'✘'} ${x[0]}</div>`).join('')}
+const tagsArr=()=>$('ntags').value.split(',').map(x=>x.trim()).filter(Boolean);
+const fullDesc=()=>{let d=$('nd').value.replace(/\s*#[\p{L}\p{N}_]+/gu,'').trim();const c=$('nc').value.trim();if(c){const i=d.indexOf('\n\n');d=i<0?d+'\n\n'+c:d.slice(0,i)+'\n\n'+c+d.slice(i)}const f=$('nf').value.trim(),h=$('nh').value.trim();if(f)d+='\n\nFAQs\n'+f;return h?d+'\n\n'+h:d};
+function rescore(){lintAll();const t=$('nt').value;const fd=fullDesc(),L=lens(),wc=fd.trim().split(/\s+/).filter(Boolean).length;$('dc').innerHTML=fd.length+' chars / '+wc+' words / '+new Blob([fd]).size+' bytes';$('dc').style.color=fd.length>=L.cmin&&fd.length<=L.cmax?'#188038':'#d93025';$('tl').textContent=t.length+'/100';const tg=tagsArr();$('tg').textContent=tg.join(',').length+'/500 chars';
+  if(vid){const s=score({title:t,description:fullDesc(),tags:tg,keyword:$('kw').value});show(1,s)}}
+async function gen(){$('gb').disabled=true;$('gb').textContent='Generating...';
+  try{const s=vid.snippet;if(!vid.chap&&/-->/.test($('notes').value)){vid.cues=parseSrt($('notes').value);vid.chap=chapterize(vid.cues,8)}const j=await api('generate',{title:s.title,description:s.description,tags:s.tags\vert{}\vert{}[],keyword:$('kw').value,notes:$('notes').value,channel:cur.name,kb:JSON.parse(localStorage[kbKey()]\vert{}\vert{}'{}'),vr:$('vr').value,len:lens(),chapters:(vid.chap||[]).map(c=>({t:fmtT(c.s),text:c.text}))});
+  $('kw').value=j.keyword;$('nt').value=j.title;$('nd').value=j.description;$('ntags').value=j.tags.join(', ');$('nh').value=j.hashtags.join(' ');$('nf').value=(j.faqs||[]).map(f=>'Q: '+f.q+'\nA: '+f.a).join('\n\n');window.TO=j.title_options||[];window.QS=j.queries||[];$('th').value=(j.thumbnail&&j.thumbnail.text)\vert{}\vert{}'';$('thb').textContent=(j.thumbnail&&j.thumbnail.brief)||'';if(vid.chap&&j.chapter_titles)$('nc').value=vid.chap.map((c,i)=>fmtT(c.s)+' '+(j.chapter_titles[i]\vert{}\vert{}'Part '+(i+1))).join('\n');$('topts').innerHTML=window.TO.map((o,i)=>`<button class="alt" style="display:block;width:100%;text-align:left;margin:4px 0;background:#fff;color:#1a1a1a" onclick="setT(${i})"><b>${esc(o.angle||'')}</b> · ${esc(o.title)} <small>(${o.title.length}) ${lintTitle(o.title,'',j.keyword).length?'⚠':'✔'}</small></button>`).join('');rescore();$('ub').disabled=false}
+  catch(e){alert('AI error: '+e.message+'\n(Local file se chalaoge to /api nahi chalega, Vercel ya vercel dev use karo)')}
+  $('gb').disabled=false;$('gb').textContent='Generate with AI'}
+async function update(){
+  const t=$('nt').value.trim(),d=fullDesc(),tg=tagsArr();
+  if(t.length>100||tg.join(',').length>500)return alert('Title 100 ya tags 500 chars se zyada hain');if(d.length>5000)return alert('Description '+d.length+' chars hai, YouTube limit 5000. Thoda chhota karo.');
+  if(!confirm('YouTube par ye update kar du?\n\nTitle: '+t))return;
+  const old={title:vid.snippet.title,description:vid.snippet.description,tags:vid.snippet.tags||[]};try{await yt('videos?part=snippet',cur.token,{method:'PUT',body:JSON.stringify({id:vid.id,snippet:{title:t,description:d,tags:tg,categoryId:vid.snippet.categoryId,defaultLanguage:vid.snippet.defaultLanguage}})});
+  $('msg').textContent='✔ Updated on YouTube';vid.snippet.description=d;vid.snippet.tags=tg;api('db',{action:'addLog',channel:cur.id,video:vid.id,kind:'change',keyword:$('kw').value,payload:{old,new:{title:t,description:d,tags:tg}}}).then(showLog).catch(()=>{});vid.snippet.title=t;$('vt').textContent=t;show(0,score({title:t,description:d,tags:tg,keyword:$('kw').value}))}
+  catch(e){alert('Update failed: '+e.message)}}
+const kbKey=()=>'kb_'+(cur?cur.id:'');
+function loadKB(){const f=k=>{$('kbo').value=k.o\vert{}\vert{}'';$('kbe').value=k.e||'';$('kbr').value=k.r\vert{}\vert{}'';$('kbv').value=k.v||''};f(JSON.parse(localStorage[kbKey()]||'{}'));const id=cur&&cur.id;if(id)api('db',{action:'getKB',channel:id}).then(j=>{if(j.data&&cur&&cur.id==id){localStorage[kbKey()]=JSON.stringify(j.data);f(j.data)}}).catch(()=>{})}
+function saveKB(){if(!cur)return alert('Pehle channel select karo');localStorage[kbKey()]=JSON.stringify({o:$('kbo').value,e:$('kbe').value,r:$('kbr').value,v:$('kbv').value});$('kbm').textContent='Saving...';api('db',{action:'setKB',channel:cur.id,data:JSON.parse(localStorage[kbKey()])}).then(()=>$('kbm').textContent='Saved to cloud ✔').catch(e=>$('kbm').textContent='Local saved, cloud error: '+e.message)}
+function expKB(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([localStorage[kbKey()]||'{}'],{type:'application/json'}));a.download=(cur?cur.name:'channel')+'-knowledge.json';a.click()}
+function impKB(i){const f=i.files[0];if(!f)return;f.text().then(t=>{localStorage[kbKey()]=t;loadKB();$('kbm').textContent='Imported ✔'})}
+const pw=()=>localStorage.pw||(localStorage.pw=prompt('App password?')||'');
+const api=async(p,b)=>{const r=await fetch('/api/'+p,{method:'POST',headers:{'Content-Type':'application/json','x-app-password':pw()},body:JSON.stringify(b)});const j=await r.json().catch(()=>({}));if(r.status==401){localStorage.pw='';throw new Error('Password galat, dobara try karo')}if(!r.ok)throw new Error(j.error||'Server error');return j};
+async function showLog(){if(!vid)return;try{const j=await api('db',{action:'getLog',video:vid.id});vid.log=j.rows;$('log').innerHTML=j.rows.map(r=>`<div>${new Date(r.created_at).toLocaleString()} — ${r.kind=='rank'?'📈 "'+r.keyword+'": '+(r.position?'#'+r.position:'top 50 me nahi'):'🔄 Metadata updated'+(r.keyword?' ('+r.keyword+')':'')}</div>`).join('')||'<small>Abhi koi history nahi</small>'}catch(e){$('log').innerHTML='<small>History: '+e.message+'</small>'}}
+async function rank(){const k=$('kw').value.trim();if(!k)return alert('Focus keyword daalo');$('rk').textContent='Checking...';
+ try{const j=await yt('search?part=snippet&type=video&maxResults=50&regionCode=IN&q='+encodeURIComponent(k),cur.token);const i=j.items.findIndex(x=>x.id.videoId==vid.id);const pos=i<0?null:i+1;
+ $('rk').textContent=pos?'Rank #'+pos:'Top 50 me nahi';await api('db',{action:'addLog',channel:cur.id,video:vid.id,kind:'rank',keyword:k,position:pos});showLog()}catch(e){$('rk').textContent='Error: '+e.message}}
+function prevVer(){const c=(vid.log||[]).find(r=>r.kind=='change');if(!c)return alert('Koi purana version nahi mila');const o=c.payload.old;$('nt').value=o.title;$('nd').value=o.description;$('ntags').value=o.tags.join(', ');$('nf').value='';$('nh').value='';rescore();$('ub').disabled=false;$('msg').textContent='Purana version load hua. Approve dabao to wapas jayega'}
+const lens=()=>({cmin:+$('cmin').value||4800,cmax:+$('cmax').value\vert{}\vert{}5000,wmin:+$('wmin').value||700,wmax:+$('wmax').value\vert{}\vert{}850}); ['cmin','cmax','wmin','wmax'].forEach(i=>{if(localStorage['l_'+i])$(i).value=localStorage['l_'+i];$(i).onchange=()=>{localStorage['l_'+i]=$(i).value;rescore()}});
+function parseSrt(t){const out=[];t.replace(/\r/g,'').split(/\n\s*\n/).forEach(b=>{const L=b.split('\n'),i=L.findIndex(l=>l.includes('-->'));if(i<0)return;const m=L[i].match(/(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)/);if(!m)return;const s=+m[1]*3600+ +m[2]*60+ +m[3]+ +m[4]/1000,e=+m[5]*3600+ +m[6]*60+ +m[7]+ +m[8]/1000,tx=L.slice(i+1).join(' ').replace(/<[^>]+>/g,'').trim();if(tx)out.push({s,e,t:tx})});return out}
+function chapterize(cues,target){if(!cues||cues.length<6)return [];const dur=cues[cues.length-1].e,wd=x=>new Set(x.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]);const cand=[];
+ for(let i=1;i<cues.length;i++){const s=cues[i].s,gap=Math.max(0,s-cues[i-1].e),b=wd(cues.filter(c=>c.s>=s-45&&c.s<s).map(c=>c.t).join(' ')),a=wd(cues.filter(c=>c.s>=s&&c.s<s+45).map(c=>c.t).join(' '));let n=0;b.forEach(w=>{if(a.has(w))n++});cand.push({s,score:(1-n/((b.size+a.size-n)||1))+Math.min(gap,3)/6})}
+ const min=Math.max(10,dur/(target*2));cand.sort((x,y)=>y.score-x.score);const pick=[0];
+ for(const c of cand){if(pick.length>=target)break;if(c.s<10||dur-c.s<10)continue;if(pick.every(q=>Math.abs(q-c.s)>=min))pick.push(c.s)}
+ pick.sort((x,y)=>x-y);return pick.map((s,i)=>({s:Math.floor(s),text:cues.filter(c=>c.s>=s&&c.s<(pick[i+1]!==undefined?pick[i+1]:1e9)).map(c=>c.t).join(' ').slice(0,250)}))}
+const fmtT=s=>{const h=vid&&vid.cues&&vid.cues.length&&vid.cues[vid.cues.length-1].e>=3600,p=x=>String(x).padStart(2,'0'),S=Math.floor(s%60);return h?Math.floor(s/3600)+':'+p(Math.floor(s%3600/60))+':'+p(S):p(Math.floor(s/60))+':'+p(S)};
+function lintTitle(t,th,k){const is=[],w=x=>x.match(/[\p{L}\p{N}]+/gu)||[];k=(k||'').toLowerCase();
+ if(t.length>60)is.push('60+ chars: desktop search me tail kat jayegi');
+ if(k&&t.length>40&&!t.toLowerCase().slice(0,40).includes(k))is.push('keyword pehle 40 chars me nahi: mobile feed me subject kat sakta hai');
+ if(w(t).filter(x=>x.length>1&&x===x.toUpperCase()&&x!==x.toLowerCase()).length>2)is.push('2 se zyada ALL-CAPS words: spam jaisa lagta hai');
+ if(th){const tw=w(th),set=new Set(w(t).map(x=>x.toLowerCase()).filter(x=>x.length>3));if(tw.length>3)is.push('thumbnail text 3 words se zyada');if(tw.some(x=>x.length>3&&set.has(x.toLowerCase())))is.push('thumbnail title ke words dohra raha hai')}
+ return is}
+function lintAll(){if(!vid)return;const is=lintTitle($('nt').value,$('th').value,$('kw').value);$('tlint').innerHTML=is.length?is.map(x=>'<div class="fail">⚠ '+x+'</div>').join(''):'<div class="pass">✔ Packaging lint OK</div>';
+ const c=$('nc').value.trim();let m='';
+ if(c){const ts=c.split('\n').map(l=>l.match(/^(?:(\d+):)?(\d{1,2}):(\d{2})\s+\S/)).map(x=>x?(+(x[1]||0))*3600+(+x[2])*60+(+x[3]):null);
+  m=ts.includes(null)?'✘ har line "mm:ss Title" format me ho':ts[0]!==0?'✘ pehla chapter 00:00 se ho':ts.length<3?'✘ kam se kam 3 chapters chahiye':ts.some((x,i)=>i&&x-ts[i-1]<10)?'✘ har chapter kam se kam 10 sec ka ho':'✔ valid ('+ts.length+')'}
+ $('cs').textContent=m;$('cs').style.color=m[0]=='✔'?'#188038':'#d93025';
+ const hay=($('nt').value+' '+fullDesc().slice(0,160)).toLowerCase();$('qs').innerHTML=(window.QS||[]).map(q=>{const ws=q.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[],ok=ws.length&&ws.every(x=>hay.includes(x));return '<div class="'+(ok?'pass':'fail')+'">'+(ok?'✔':'✘')+' Query: '+esc(q)+'</div>'}).join('')}
+const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function setT(i){$('nt').value=window.TO[i].title;rescore()}
+function getTerms(){const kb=JSON.parse(localStorage[kbKey()]||'{}');const raw=(kb.r||'')+'\n'+($('vr').value\vert{}\vert{}'');return [...new Set(raw.split(/[\n,;\vert{}•·]+/).map(x=>x.replace(/^[\s\-*\d.)]+/,'').replace(/^[A-Za-z ]{3,30}:/,'').trim()).filter(x=>x.length>=3&&x.length<=40))]}$('vr').oninput=rescore;
+async function getTr(){if(!vid)return;$('trm').textContent='Loading...';
+ try{const l=await yt('captions?part=snippet&videoId='+vid.id,cur.token);const it=l.items||[];if(!it.length)throw new Error('Is video par caption track nahi hai');
+ const lang=(vid.snippet.defaultAudioLanguage||vid.snippet.defaultLanguage||'').slice(0,2);
+ const pick=it.find(c=>c.snippet.trackKind!=='asr'&&c.snippet.language.startsWith(lang))||it.find(c=>c.snippet.trackKind!=='asr')||it.find(c=>c.snippet.language.startsWith(lang))||it[0];
+ const r=await fetch('https://www.googleapis.com/youtube/v3/captions/'+pick.id+'?tfmt=srt',{headers:{Authorization:'Bearer '+cur.token}});if(!r.ok)throw new Error('Download error '+r.status+' (auto captions aksar download nahi hote)');
+ const raw=await r.text();vid.cues=parseSrt(raw);const t=raw.split('\n').filter(x=>x.trim()&&!/^\d+$/.test(x.trim())&&!x.includes('-->')).join(' ').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+ $('notes').value=t.slice(0,12000);vid.chap=chapterize(vid.cues,8);$('trm').textContent='✔ '+pick.snippet.language+(pick.snippet.trackKind=='asr'?' (auto)':'')+' · '+t.length+' chars · '+vid.chap.length+' chapter points ready'}
+ catch(e){$('trm').textContent='✘ '+e.message+'. Notes khud paste karo'}}
+</script></body></html>
