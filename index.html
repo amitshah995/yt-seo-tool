@@ -39,6 +39,7 @@ label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
   <div class="card" id="ed" style="display:none">
     <b id="vt"></b>
     <div style="display:flex;gap:8px;margin-top:8px"><input id="kw" placeholder="Focus keyword (optional)"><button onclick="gen()" id="gb">Generate with AI</button></div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px"><small><b>Description size:</b> chars</small><input id="cmin" type="number" value="4800" style="width:80px"><small>to</small><input id="cmax" type="number" value="5000" style="width:80px"><small>words</small><input id="wmin" type="number" value="700" style="width:70px"><small>to</small><input id="wmax" type="number" value="850" style="width:70px"></div>
     <label>Extra notes / transcript (optional)</label><textarea id="notes" style="min-height:60px"></textarea>
     <label>Research for this video: top-10 entities, attributes, sentiment words (optional)</label><textarea id="vr" style="min-height:60px"></textarea>
     <div class="cols">
@@ -46,7 +47,7 @@ label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
       <div><h4>New (editable) <span id="s1" class="score"></span></h4><div id="c1" class="chk"></div></div>
     </div>
     <label>Title <small id="tl"></small></label><input id="nt" oninput="rescore()">
-    <label>Description</label><textarea id="nd" style="min-height:220px" oninput="rescore()"></textarea>
+    <label>Description <small id="dc"></small></label><textarea id="nd" style="min-height:220px" oninput="rescore()"></textarea>
     <label>FAQs (description me add honge)</label><textarea id="nf" style="min-height:120px" oninput="rescore()"></textarea>
     <label>Tags (comma separated) <small id="tg"></small></label><textarea id="ntags" style="min-height:60px" oninput="rescore()"></textarea>
     <label>Hashtags (space separated, 3-5)</label><input id="nh" oninput="rescore()">
@@ -91,16 +92,16 @@ function show(i,s){$('s'+i).textContent=s.total+'/100';$('s'+i).style.color=s.to
   $('c'+i).innerHTML=s.c.map(x=>`<div class="${x[1]?'pass':'fail'}">${x[1]?'✔':'✘'} ${x[0]}</div>`).join('')}
 const tagsArr=()=>$('ntags').value.split(',').map(x=>x.trim()).filter(Boolean);
 const fullDesc=()=>{let d=$('nd').value.replace(/\s*#[\p{L}\p{N}_]+/gu,'').trim();const f=$('nf').value.trim(),h=$('nh').value.trim();if(f)d+='\n\nFAQs\n'+f;return h?d+'\n\n'+h:d};
-function rescore(){const t=$('nt').value;$('tl').textContent=t.length+'/100';const tg=tagsArr();$('tg').textContent=tg.join(',').length+'/500 chars';
+function rescore(){const t=$('nt').value;const fd=fullDesc(),L=lens(),wc=fd.trim().split(/\s+/).filter(Boolean).length;$('dc').innerHTML=fd.length+' chars / '+wc+' words / '+new Blob([fd]).size+' bytes';$('dc').style.color=fd.length>=L.cmin&&fd.length<=L.cmax?'#188038':'#d93025';$('tl').textContent=t.length+'/100';const tg=tagsArr();$('tg').textContent=tg.join(',').length+'/500 chars';
   if(vid){const s=score({title:t,description:fullDesc(),tags:tg,keyword:$('kw').value});show(1,s)}}
 async function gen(){$('gb').disabled=true;$('gb').textContent='Generating...';
-  try{const s=vid.snippet;const j=await api('generate',{title:s.title,description:s.description,tags:s.tags||[],keyword:$('kw').value,notes:$('notes').value,channel:cur.name,kb:JSON.parse(localStorage[kbKey()]||'{}'),vr:$('vr').value});
+  try{const s=vid.snippet;const j=await api('generate',{title:s.title,description:s.description,tags:s.tags||[],keyword:$('kw').value,notes:$('notes').value,channel:cur.name,kb:JSON.parse(localStorage[kbKey()]||'{}'),vr:$('vr').value,len:lens()});
   $('kw').value=j.keyword;$('nt').value=j.title;$('nd').value=j.description;$('ntags').value=j.tags.join(', ');$('nh').value=j.hashtags.join(' ');$('nf').value=(j.faqs||[]).map(f=>'Q: '+f.q+'\nA: '+f.a).join('\n\n');rescore();$('ub').disabled=false}
   catch(e){alert('AI error: '+e.message+'\n(Local file se chalaoge to /api nahi chalega, Vercel ya vercel dev use karo)')}
   $('gb').disabled=false;$('gb').textContent='Generate with AI'}
 async function update(){
   const t=$('nt').value.trim(),d=fullDesc(),tg=tagsArr();
-  if(t.length>100||tg.join(',').length>500)return alert('Title 100 ya tags 500 chars se zyada hain');
+  if(t.length>100||tg.join(',').length>500)return alert('Title 100 ya tags 500 chars se zyada hain');if(d.length>5000)return alert('Description '+d.length+' chars hai, YouTube limit 5000. Thoda chhota karo.');
   if(!confirm('YouTube par ye update kar du?\n\nTitle: '+t))return;
   const old={title:vid.snippet.title,description:vid.snippet.description,tags:vid.snippet.tags||[]};try{await yt('videos?part=snippet',cur.token,{method:'PUT',body:JSON.stringify({id:vid.id,snippet:{title:t,description:d,tags:tg,categoryId:vid.snippet.categoryId,defaultLanguage:vid.snippet.defaultLanguage}})});
   $('msg').textContent='✔ Updated on YouTube';vid.snippet.description=d;vid.snippet.tags=tg;api('db',{action:'addLog',channel:cur.id,video:vid.id,kind:'change',keyword:$('kw').value,payload:{old,new:{title:t,description:d,tags:tg}}}).then(showLog).catch(()=>{});vid.snippet.title=t;$('vt').textContent=t;show(0,score({title:t,description:d,tags:tg,keyword:$('kw').value}))}
@@ -117,4 +118,6 @@ async function rank(){const k=$('kw').value.trim();if(!k)return alert('Focus key
  try{const j=await yt('search?part=snippet&type=video&maxResults=50&regionCode=IN&q='+encodeURIComponent(k),cur.token);const i=j.items.findIndex(x=>x.id.videoId==vid.id);const pos=i<0?null:i+1;
  $('rk').textContent=pos?'Rank #'+pos:'Top 50 me nahi';await api('db',{action:'addLog',channel:cur.id,video:vid.id,kind:'rank',keyword:k,position:pos});showLog()}catch(e){$('rk').textContent='Error: '+e.message}}
 function prevVer(){const c=(vid.log||[]).find(r=>r.kind=='change');if(!c)return alert('Koi purana version nahi mila');const o=c.payload.old;$('nt').value=o.title;$('nd').value=o.description;$('ntags').value=o.tags.join(', ');$('nf').value='';$('nh').value='';rescore();$('ub').disabled=false;$('msg').textContent='Purana version load hua. Approve dabao to wapas jayega'}
+const lens=()=>({cmin:+$('cmin').value||4800,cmax:+$('cmax').value||5000,wmin:+$('wmin').value||700,wmax:+$('wmax').value||850});
+['cmin','cmax','wmin','wmax'].forEach(i=>{if(localStorage['l_'+i])$(i).value=localStorage['l_'+i];$(i).onchange=()=>{localStorage['l_'+i]=$(i).value;rescore()}});
 </script></body></html>
