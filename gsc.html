@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GSC Striking Distance</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{--bg:#f3f6f8;--ink:#12263a;--mut:#5b6f82;--line:#d5dee5;--acc:#0b7a75;--card:#fff;--warn:#c2410c}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1a24;--ink:#e6eef5;--mut:#8fa4b8;--line:#25364a;--acc:#3cc4bb;--card:#16232f;--warn:#fb923c}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Source Sans 3",system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:26px;margin:0 0 4px}h2{font-size:17px;margin:0 0 10px}p.s{color:var(--mut);margin:0 0 18px}
+section{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+label{display:block;font-size:13px;color:var(--mut);margin-bottom:3px}
+input,select,textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+textarea{min-height:90px}
+button{padding:8px 14px;border:0;border-radius:6px;background:var(--acc);color:#fff;font:600 14px inherit;cursor:pointer}
+button.o{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+#msg{color:var(--warn);font-size:14px}
+.w{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--mut);font-weight:600;white-space:nowrap}
+td.n{text-align:right;font-variant-numeric:tabular-nums}td.u{max-width:260px;word-break:break-all;color:var(--mut);font-size:13px}
+.card{border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px}
+.card h3{margin:0 0 6px;font-size:15px}.card dt{color:var(--mut);font-size:12px;margin-top:6px}.card dd{margin:0}
+.ok{border-color:var(--acc)}
+</style></head><body><main>
+<h1>Striking distance keywords</h1>
+<p class="s">Find queries stuck on page 2, get AI fixes, approve what you want, export.</p>
+
+<section><h2>Setup</h2>
+<div class="g">
+<div><label>Google OAuth Client ID</label><input id="cid" placeholder="xxxx.apps.googleusercontent.com"></div>
+<div><label>Anthropic API key</label><input id="akey" type="password" placeholder="sk-ant-..."></div>
+<div><label>Model</label><input id="model" value="claude-haiku-4-5-20251001"></div>
+</div>
+<div class="bar"><button id="conn">Connect Google</button><select id="site" style="max-width:340px"></select><span id="msg"></span></div>
+</section>
+
+<section><h2>Filters</h2>
+<div class="g">
+<div><label>Days</label><input id="days" type="number" value="28"></div>
+<div><label>Position from</label><input id="pmin" type="number" value="8"></div>
+<div><label>Position to</label><input id="pmax" type="number" value="20"></div>
+<div><label>Min impressions</label><input id="imp" type="number" value="50"></div>
+</div>
+<div class="bar"><button id="go">Fetch keywords</button><button class="o" id="top">Select top 10</button><button class="o" id="csv">Export CSV</button></div>
+</section>
+
+<section><h2>Keywords <span id="cnt" style="color:var(--mut);font-weight:400"></span></h2>
+<div class="w"><table><thead><tr><th></th><th>Query</th><th>Page</th><th>Impr.</th><th>Clicks</th><th>CTR %</th><th>Pos.</th><th title="Impressions x 10% minus current clicks">Est. extra clicks</th></tr></thead><tbody id="tb"></tbody></table></div>
+</section>
+
+<section><h2>Our SEO strategy (sent to the AI)</h2>
+<textarea id="strat">Title max 60 chars, keyword near the start, brand at the end. Meta max 155 chars with a clear call to action. One H1 with the exact keyword. Match search intent, add missing subtopics, and suggest internal links from related pages. Write in simple natural language for Indian audience.</textarea>
+<div class="bar"><button id="ai">Get AI suggestions for selected (max 10)</button><button class="o" id="exp">Export approved</button></div>
+<div id="out" style="margin-top:12px"></div>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s);let token='',rows=[],sel=new Set(),res=[];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const msg=t=>$('#msg').textContent=t||'';
+['cid','akey','model','strat'].forEach(k=>{const e=$('#'+k);try{e.value=localStorage.getItem(k)||e.value}catch(_){}e.oninput=()=>{try{localStorage.setItem(k,e.value)}catch(_){}}});
+async function g(u,o={}){const r=await fetch(u,{...o,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}});if(!r.ok)throw new Error((await r.text()).slice(0,200));return r.json()}
+$('#conn').onclick=()=>{const id=$('#cid').value.trim();if(!id)return msg('Enter the Google Client ID first.');
+ google.accounts.oauth2.initTokenClient({client_id:id,scope:'https://www.googleapis.com/auth/webmasters.readonly',callback:async r=>{if(r.error)return msg(r.error);token=r.access_token;try{const d=await g('https://www.googleapis.com/webmasters/v3/sites');const l=d.siteEntry||[];$('#site').innerHTML=l.map(s=>`<option>${esc(s.siteUrl)}</option>`).join('');msg(l.length+' properties found.')}catch(e){msg(e.message)}}}).requestAccessToken()};
+$('#go').onclick=async()=>{if(!token)return msg('Connect Google first.');try{
+ msg('Loading...');const days=+$('#days').value,e=new Date(Date.now()-2*864e5),s=new Date(e-(days-1)*864e5),f=d=>d.toISOString().slice(0,10);
+ const d=await g('https://www.googleapis.com/webmasters/v3/sites/'+encodeURIComponent($('#site').value)+'/searchAnalytics/query',{method:'POST',body:JSON.stringify({startDate:f(s),endDate:f(e),dimensions:['query','page'],rowLimit:25000})});
+ const lo=+$('#pmin').value,hi=+$('#pmax').value,im=+$('#imp').value;
+ rows=(d.rows||[]).filter(r=>r.position>=lo&&r.position<=hi&&r.impressions>=im).map(r=>({q:r.keys[0],p:r.keys[1],i:r.impressions,c:r.clicks,ctr:r.ctr*100,pos:r.position,gain:Math.max(0,Math.round(r.impressions*.1-r.clicks))})).sort((a,b)=>b.gain-a.gain);
+ sel.clear();draw();msg('')}catch(e){msg(e.message)}};
+function draw(){$('#cnt').textContent='('+rows.length+')';$('#tb').innerHTML=rows.map((r,n)=>`<tr><td><input type="checkbox" data-n="${n}" ${sel.has(n)?'checked':''}></td><td>${esc(r.q)}</td><td class="u">${esc(r.p)}</td><td class="n">${r.i}</td><td class="n">${r.c}</td><td class="n">${r.ctr.toFixed(1)}</td><td class="n">${r.pos.toFixed(1)}</td><td class="n"><b>${r.gain}</b></td></tr>`).join('')||'<tr><td colspan="8">No keywords yet. Connect Google and fetch.</td></tr>'}
+$('#tb').onchange=e=>{const n=+e.target.dataset.n;e.target.checked?sel.add(n):sel.delete(n)};
+$('#top').onclick=()=>{sel=new Set(rows.slice(0,10).map((_,n)=>n));draw()};
+function dl(name,data){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'text/csv'}));a.download=name;a.click()}
+const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+$('#csv').onclick=()=>dl('striking-distance.csv',['query,page,impressions,clicks,ctr,position,est_extra_clicks',...rows.map(r=>[q(r.q),q(r.p),r.i,r.c,r.ctr.toFixed(2),r.pos.toFixed(1),r.gain].join(','))].join('\n'));
+$('#ai').onclick=async()=>{const pick=[...sel].sort((a,b)=>a-b).slice(0,10).map(n=>rows[n]);if(!pick.length)return msg('Select keywords first.');if(!$('#akey').value)return msg('Add the Anthropic API key.');
+ msg('Asking AI...');const prompt=`You are an SEO expert. Our strategy:\n${$('#strat').value}\n\nEach item below ranks on page 2 or low page 1. Give fixes to reach the top 5. Return ONLY a JSON array, same order, one object per item: {"title":"","meta":"","h1":"","add_content":["3 short points"],"internal_links":["2 anchor ideas"]}\n\nItems:\n`+pick.map((r,n)=>`${n+1}. keyword: ${r.q} | page: ${r.p} | position: ${r.pos.toFixed(1)} | impressions: ${r.i}`).join('\n');
+ try{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':$('#akey').value.trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:$('#model').value,max_tokens:4000,messages:[{role:'user',content:prompt}]})});
+ const d=await r.json();if(!r.ok)throw new Error(d.error?.message||'API error');const t=d.content.map(x=>x.text||'').join('').replace(/```json|```/g,'').trim();const a=JSON.parse(t);
+ res=pick.map((r,n)=>({...r,...(a[n]||{}),ok:false}));msg('');show()}catch(e){msg(e.message)}};
+function show(){$('#out').innerHTML=res.map((r,n)=>`<div class="card ${r.ok?'ok':''}"><h3>${esc(r.q)} <span style="color:var(--mut);font-weight:400">pos ${r.pos.toFixed(1)}</span></h3><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" style="width:auto" data-a="${n}" ${r.ok?'checked':''}> Approve</label><dl><dt>Page</dt><dd>${esc(r.p)}</dd><dt>Title</dt><dd>${esc(r.title||'')}</dd><dt>Meta</dt><dd>${esc(r.meta||'')}</dd><dt>H1</dt><dd>${esc(r.h1||'')}</dd><dt>Add to content</dt><dd>${(r.add_content||[]).map(esc).join('<br>')}</dd><dt>Internal links</dt><dd>${(r.internal_links||[]).map(esc).join('<br>')}</dd></dl></div>`).join('')}
+$('#out').onchange=e=>{const n=e.target.dataset.a;if(n!=null){res[n].ok=e.target.checked;e.target.closest('.card').classList.toggle('ok',e.target.checked)}};
+$('#exp').onclick=()=>{const a=res.filter(r=>r.ok);if(!a.length)return msg('Approve at least one.');dl('approved-fixes.csv',['query,page,position,title,meta,h1,add_content,internal_links',...a.map(r=>[q(r.q),q(r.p),r.pos.toFixed(1),q(r.title||''),q(r.meta||''),q(r.h1||''),q((r.add_content||[]).join(' | ')),q((r.internal_links||[]).join(' | '))].join(','))].join('\n'))};
+draw();
+</script></body></html>
