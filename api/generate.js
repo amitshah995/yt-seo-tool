@@ -1,6 +1,8 @@
+
 // Vercel serverless function. Env: ANTHROPIC_API_KEY (optional: MODEL)
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  if (!process.env.APP_PASSWORD || req.headers['x-app-password'] !== process.env.APP_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   const { title = '', description = '', tags = [], keyword = '', notes = '', channel = '', kb = {}, vr = '' } = req.body || {};
   const prompt = `You are a senior YouTube SEO expert. Optimize this video's metadata.
 Channel: ${channel}
