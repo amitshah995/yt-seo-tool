@@ -1,9 +1,16 @@
-
-// Vercel serverless function. Env: ANTHROPIC_API_KEY (optional: MODEL)
+// Vercel serverless function. Env: ANTHROPIC_API_KEY, APP_PASSWORD (optional: MODEL)
+const compose = j => {
+  let d = (j.description || '').replace(/\s*#[\p{L}\p{N}_]+/gu, '').trim();
+  const f = (j.faqs || []).map(x => 'Q: ' + x.q + '\nA: ' + x.a).join('\n\n');
+  if (f) d += '\n\nFAQs\n' + f;
+  const h = (j.hashtags || []).join(' ');
+  return h ? d + '\n\n' + h : d;
+};
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   if (!process.env.APP_PASSWORD || req.headers['x-app-password'] !== process.env.APP_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
-  const { title = '', description = '', tags = [], keyword = '', notes = '', channel = '', kb = {}, vr = '' } = req.body || {};
+  const { title = '', description = '', tags = [], keyword = '', notes = '', channel = '', kb = {}, vr = '', len = {} } = req.body || {};
+  const cmin = +len.cmin || 4800, cmax = +len.cmax || 5000, wmin = +len.wmin || 700, wmax = +len.wmax || 850;
   const prompt = `You are a senior YouTube SEO expert. Optimize this video's metadata.
 Channel: ${channel}
 Current title: ${title}
@@ -27,20 +34,34 @@ Rules:
 - Use ONLY facts from official data/notes. Never invent facts, prices, income or earning claims, guarantees, or medical claims.
 - Weave the research entities, attributes and sentiment words naturally into title, description, tags and FAQs. No keyword stuffing, do not copy competitor text.
 - Title: 50-70 chars, primary keyword in the first 40 chars, 1-2 strongest research terms, click-worthy but honest.
-- Description: 250+ words, keyword in first 150 chars, keep original timestamps/links/CTAs. No hashtags and no FAQs inside it.
-- FAQs: 4-6 Q&A, answers 1-2 sentences, based on official data.
+- LENGTH (most important): description + FAQs + hashtags combined must be between ${cmin} and ${cmax} characters (about ${wmin}-${wmax} words). The YouTube description box must look fully used, like a human SEO expert wrote it: keyword in first 150 chars, strong intro, detailed sections (what the video covers, who it is for, key takeaways, step-by-step points), keyword variations, about the brand/channel, original timestamps/links/CTAs kept. Never pad with repeated sentences or invented facts. No hashtags and no FAQs inside "description".
+- FAQs: 6-10 Q&A, answers 1-3 sentences, based on official data. They count toward the length.
 - Tags: 10-14, total under 450 characters. Hashtags: exactly 3-5, each starting with #.
 Return ONLY JSON: {"keyword":"","title":"","description":"","faqs":[{"q":"","a":""}],"tags":[],"hashtags":[]}`;
-  try {
+  const ask = async msgs => {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: process.env.MODEL || 'claude-sonnet-5-5', max_tokens: 3500, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: process.env.MODEL || 'claude-sonnet-5-5', max_tokens: 8000, messages: msgs })
     });
     const j = await r.json();
-    if (!r.ok) return res.status(500).json({ error: j.error?.message || 'AI error' });
-    const text = j.content.map(c => c.text || '').join('').replace(/```json|```/g, '').trim();
-    return res.status(200).json(JSON.parse(text));
+    if (!r.ok) throw new Error(j.error?.message || 'AI error');
+    return j.content.map(c => c.text || '').join('');
+  };
+  try {
+    const msgs = [{ role: 'user', content: prompt }];
+    const mid = (cmin + cmax) / 2;
+    let best = null, bestLen = 0;
+    for (let i = 0; i < 4; i++) {
+      const text = await ask(msgs);
+      let out;
+      try { out = JSON.parse(text.replace(/```json|```/g, '').trim()); } catch (e) { if (best) break; throw e; }
+      const L = compose(out).length;
+      if (!best || Math.abs(L - mid) < Math.abs(bestLen - mid)) { best = out; bestLen = L; }
+      if (L >= cmin && L <= cmax) break;
+      msgs.push({ role: 'assistant', content: text }, { role: 'user', content: `Combined length (description + FAQs + hashtags) is ${L} characters but it must be between ${cmin} and ${cmax}. ${L < cmin ? 'Add about ' + (cmin - L + 150) + ' more characters of genuinely useful, non-repeating content (more detail sections, takeaways, FAQs)' : 'Cut about ' + (L - cmax + 150) + ' characters'}. Return the full JSON again.` });
+    }
+    return res.status(200).json({ ...best, _len: bestLen });
   } catch (e) {
     return res.status(500).json({ error: String(e.message || e) });
   }
