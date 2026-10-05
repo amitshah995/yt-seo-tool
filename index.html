@@ -40,13 +40,13 @@ label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
     <b id="vt"></b>
     <div style="display:flex;gap:8px;margin-top:8px"><input id="kw" placeholder="Focus keyword (optional)"><button onclick="gen()" id="gb">Generate with AI</button></div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px"><small><b>Description size:</b> chars</small><input id="cmin" type="number" value="4800" style="width:80px"><small>to</small><input id="cmax" type="number" value="5000" style="width:80px"><small>words</small><input id="wmin" type="number" value="700" style="width:70px"><small>to</small><input id="wmax" type="number" value="850" style="width:70px"></div>
-    <label>Extra notes / transcript (optional)</label><textarea id="notes" style="min-height:60px"></textarea>
+    <label>Extra notes / transcript (optional) <button class="alt" style="padding:2px 8px;font-size:12px" onclick="getTr()">Auto transcript</button> <small id="trm"></small></label><textarea id="notes" style="min-height:60px"></textarea>
     <label>Research for this video: top-10 entities, attributes, sentiment words (optional)</label><textarea id="vr" style="min-height:60px"></textarea>
     <div class="cols">
       <div><h4>Current <span id="s0" class="score"></span></h4><div id="c0" class="chk"></div></div>
       <div><h4>New (editable) <span id="s1" class="score"></span></h4><div id="c1" class="chk"></div></div>
     </div>
-    <label>Title <small id="tl"></small></label><input id="nt" oninput="rescore()">
+    <label>Title <small id="tl"></small></label><input id="nt" oninput="rescore()"><div id="topts"></div>
     <label>Description <small id="dc"></small></label><textarea id="nd" style="min-height:220px" oninput="rescore()"></textarea>
     <label>FAQs (description me add honge)</label><textarea id="nf" style="min-height:120px" oninput="rescore()"></textarea>
     <label>Tags (comma separated) <small id="tg"></small></label><textarea id="ntags" style="min-height:60px" oninput="rescore()"></textarea>
@@ -80,14 +80,17 @@ async function loadOne(){if(!cur)return alert('Pehle channel connect karo');cons
 async function open_(id){document.querySelectorAll('.vid').forEach(e=>e.classList.remove('on'));$('v_'+id)?.classList.add('on');
   const j=await yt('videos?part=snippet&id='+id,cur.token);const s=j.items?.[0]?.snippet;if(!s)return alert('Video nahi mila / is channel ka nahi');
   vid={id,snippet:s};$('ed').style.display='block';$('vt').textContent=s.title;
-  $('nt').value=s.title;$('nd').value=s.description;$('ntags').value=(s.tags||[]).join(', ');$('nh').value='';$('nf').value='';$('vr').value='';$('kw').value='';$('ub').disabled=true;$('msg').textContent='';
+  $('nt').value=s.title;$('nd').value=s.description;$('ntags').value=(s.tags||[]).join(', ');$('nh').value='';$('nf').value='';$('vr').value='';$('topts').innerHTML='';$('kw').value='';$('ub').disabled=true;$('msg').textContent='';
   const sc=score({title:s.title,description:s.description,tags:s.tags||[],keyword:''});show(0,sc);rescore();showLog()}
 function score(v){const k=(v.keyword||'').toLowerCase(),t=v.title.toLowerCase(),d=v.description.toLowerCase();
   const w=v.description.trim().split(/\s+/).filter(Boolean).length,hs=(v.description.match(/#[\p{L}\p{N}_]+/gu)||[]).length,tc=v.tags.join(',').length;
   const c=[['Title 40-70 chars',t.length>=40&&t.length<=70,15],['Keyword in title',!!k&&t.includes(k),20],['Keyword in first 40 chars of title',!!k&&t.indexOf(k)>=0&&t.indexOf(k)<=40,10],
   ['Keyword in first 150 chars of description',!!k&&d.slice(0,150).includes(k),15],['Description 200+ words ('+w+')',w>=200,15],
   ['8-15 tags, under 500 chars ('+v.tags.length+')',v.tags.length>=8&&v.tags.length<=15&&tc<=500,10],['Keyword in tags',!!k&&v.tags.some(x=>x.toLowerCase().includes(k)),5],['3-5 hashtags ('+hs+')',hs>=3&&hs<=5,10]];
-  return{total:c.reduce((a,x)=>a+(x[1]?x[2]:0),0),c}}
+  const terms=getTerms();let total=c.reduce((a,x)=>a+(x[1]?x[2]:0),0)*(terms.length?0.8:1);
+  if(terms.length){const tx=(v.title+' '+v.description+' '+v.tags.join(' ')).toLowerCase(),miss=terms.filter(t=>!tx.includes(t.toLowerCase())),hit=terms.length-miss.length;
+   total+=hit/terms.length*20;c.push(['Research terms used '+hit+'/'+terms.length,hit/terms.length>=.6,0]);if(miss.length)c.push(['Missing: '+miss.slice(0,8).join(', '),false,0])}
+  return{total:Math.round(total),c}}
 function show(i,s){$('s'+i).textContent=s.total+'/100';$('s'+i).style.color=s.total>=80?'#188038':s.total>=50?'#e37400':'#d93025';
   $('c'+i).innerHTML=s.c.map(x=>`<div class="${x[1]?'pass':'fail'}">${x[1]?'✔':'✘'} ${x[0]}</div>`).join('')}
 const tagsArr=()=>$('ntags').value.split(',').map(x=>x.trim()).filter(Boolean);
@@ -96,7 +99,7 @@ function rescore(){const t=$('nt').value;const fd=fullDesc(),L=lens(),wc=fd.trim
   if(vid){const s=score({title:t,description:fullDesc(),tags:tg,keyword:$('kw').value});show(1,s)}}
 async function gen(){$('gb').disabled=true;$('gb').textContent='Generating...';
   try{const s=vid.snippet;const j=await api('generate',{title:s.title,description:s.description,tags:s.tags||[],keyword:$('kw').value,notes:$('notes').value,channel:cur.name,kb:JSON.parse(localStorage[kbKey()]||'{}'),vr:$('vr').value,len:lens()});
-  $('kw').value=j.keyword;$('nt').value=j.title;$('nd').value=j.description;$('ntags').value=j.tags.join(', ');$('nh').value=j.hashtags.join(' ');$('nf').value=(j.faqs||[]).map(f=>'Q: '+f.q+'\nA: '+f.a).join('\n\n');rescore();$('ub').disabled=false}
+  $('kw').value=j.keyword;$('nt').value=j.title;$('nd').value=j.description;$('ntags').value=j.tags.join(', ');$('nh').value=j.hashtags.join(' ');$('nf').value=(j.faqs||[]).map(f=>'Q: '+f.q+'\nA: '+f.a).join('\n\n');window.TO=j.title_options||[];$('topts').innerHTML=window.TO.map((o,i)=>`<button class="alt" style="display:block;width:100%;text-align:left;margin:4px 0;background:#fff;color:#1a1a1a" onclick="setT(${i})"><b>${esc(o.angle||'')}</b> · ${esc(o.title)} <small>(${o.title.length})</small></button>`).join('');rescore();$('ub').disabled=false}
   catch(e){alert('AI error: '+e.message+'\n(Local file se chalaoge to /api nahi chalega, Vercel ya vercel dev use karo)')}
   $('gb').disabled=false;$('gb').textContent='Generate with AI'}
 async function update(){
@@ -120,4 +123,16 @@ async function rank(){const k=$('kw').value.trim();if(!k)return alert('Focus key
 function prevVer(){const c=(vid.log||[]).find(r=>r.kind=='change');if(!c)return alert('Koi purana version nahi mila');const o=c.payload.old;$('nt').value=o.title;$('nd').value=o.description;$('ntags').value=o.tags.join(', ');$('nf').value='';$('nh').value='';rescore();$('ub').disabled=false;$('msg').textContent='Purana version load hua. Approve dabao to wapas jayega'}
 const lens=()=>({cmin:+$('cmin').value||4800,cmax:+$('cmax').value||5000,wmin:+$('wmin').value||700,wmax:+$('wmax').value||850});
 ['cmin','cmax','wmin','wmax'].forEach(i=>{if(localStorage['l_'+i])$(i).value=localStorage['l_'+i];$(i).onchange=()=>{localStorage['l_'+i]=$(i).value;rescore()}});
+const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function setT(i){$('nt').value=window.TO[i].title;rescore()}
+function getTerms(){const kb=JSON.parse(localStorage[kbKey()]||'{}');const raw=(kb.r||'')+'\n'+($('vr').value||'');return [...new Set(raw.split(/[\n,;|•·]+/).map(x=>x.replace(/^[\s\-*\d.)]+/,'').replace(/^[A-Za-z ]{3,30}:/,'').trim()).filter(x=>x.length>=3&&x.length<=40))]}
+$('vr').oninput=rescore;
+async function getTr(){if(!vid)return;$('trm').textContent='Loading...';
+ try{const l=await yt('captions?part=snippet&videoId='+vid.id,cur.token);const it=l.items||[];if(!it.length)throw new Error('Is video par caption track nahi hai');
+ const lang=(vid.snippet.defaultAudioLanguage||vid.snippet.defaultLanguage||'').slice(0,2);
+ const pick=it.find(c=>c.snippet.trackKind!=='asr'&&c.snippet.language.startsWith(lang))||it.find(c=>c.snippet.trackKind!=='asr')||it.find(c=>c.snippet.language.startsWith(lang))||it[0];
+ const r=await fetch('https://www.googleapis.com/youtube/v3/captions/'+pick.id+'?tfmt=srt',{headers:{Authorization:'Bearer '+cur.token}});if(!r.ok)throw new Error('Download error '+r.status+' (auto captions aksar download nahi hote)');
+ const t=(await r.text()).split('\n').filter(x=>x.trim()&&!/^\d+$/.test(x.trim())&&!x.includes('-->')).join(' ').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+ $('notes').value=t.slice(0,12000);$('trm').textContent='✔ '+pick.snippet.language+(pick.snippet.trackKind=='asr'?' (auto)':'')+' · '+t.length+' chars'}
+ catch(e){$('trm').textContent='✘ '+e.message+'. Notes khud paste karo'}}
 </script></body></html>
